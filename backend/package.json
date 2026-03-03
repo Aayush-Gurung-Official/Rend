@@ -1,0 +1,23 @@
+{
+  "name": "rend-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Rend room and house rental platform",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.27",
+    "nodemon": "^3.1.4",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.1"
+  }
+}
