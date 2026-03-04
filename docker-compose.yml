@@ -7,8 +7,6 @@ services:
       - "3000:3000"
     env_file:
       - ./backend/.env
-    volumes:
-      - ./backend:/usr/src/app
     networks:
       - rend-network
 
@@ -22,8 +20,6 @@ services:
       - ./frontend/.env
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/usr/src/app
     networks:
       - rend-network
 
