@@ -1,13 +1,9 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import SearchBar from "../components/SearchBar.jsx";
 import ListingsGrid from "../components/ListingsGrid.jsx";
 import ServicesSection from "../components/ServicesSection.jsx";
 import HelpSection from "../components/HelpSection.jsx";
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  (typeof __API_URL__ !== "undefined" ? __API_URL__ : "http://localhost:5000");
+import { fetchListings as fetchListingsApi } from "../services/listingService.js";
 
 const Home = () => {
   const [filters, setFilters] = useState({
@@ -27,14 +23,8 @@ const Home = () => {
   const fetchListings = async () => {
     try {
       setLoading(true);
-      const params = {};
-      if (filters.type && filters.type !== "all") params.type = filters.type;
-      if (filters.city) params.city = filters.city;
-      if (filters.minPrice) params.minPrice = filters.minPrice;
-      if (filters.maxPrice) params.maxPrice = filters.maxPrice;
-
-      const res = await axios.get(`${API_URL}/api/listings`, { params });
-      setListings(res.data);
+      const data = await fetchListingsApi(filters);
+      setListings(data);
     } catch (e) {
       console.error(e);
     } finally {

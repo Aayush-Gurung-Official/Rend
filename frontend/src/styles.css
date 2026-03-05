@@ -6,3 +6,6 @@ body {
   @apply font-sans text-slate-800;
 }
 
+@import "./styles/custom.css";
+
+
