@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { signup, login } from "../services/authService.js";
 
 const Auth = () => {
-  const [mode, setMode] = useState("signup"); // "login" | "signup"
+  const [mode, setMode] = useState("login"); // "login" | "signup"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const navigate = useNavigate();
 
@@ -19,6 +20,7 @@ const Auth = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
     try {
       setLoading(true);
@@ -27,11 +29,17 @@ const Auth = () => {
           ? await signup({ username, password })
           : await login({ username, password });
 
-      window.localStorage.setItem("rendUser", JSON.stringify(user));
-      navigate("/dashboard");
+      if (mode === "signup") {
+        setSuccess("Account created successfully! Please login to continue.");
+        setMode("login");
+        resetFields();
+      } else {
+        window.localStorage.setItem("rendUser", JSON.stringify(user));
+        navigate("/user-type");
+      }
     } catch (err) {
       const msg =
-        err?.response?.data?.message || "Something went wrong. Please try again.";
+        err?.response?.data?.message || err?.message || "Something went wrong. Please try again.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -49,16 +57,24 @@ const Auth = () => {
           <h1 className="text-xl font-semibold text-slate-900">
             {mode === "signup" ? "Create your account" : "Login"}
           </h1>
-          <button
-            className="text-xs font-semibold text-primary hover:text-primary-dark"
-            onClick={() => {
-              setError("");
-              resetFields();
-              setMode((m) => (m === "signup" ? "login" : "signup"));
-            }}
-          >
-            {mode === "signup" ? "Use existing account" : "New here? Sign up"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900"
+              onClick={() => navigate("/")}
+            >
+              Back
+            </button>
+            <button
+              className="text-xs font-semibold text-primary hover:text-primary-dark"
+              onClick={() => {
+                setError("");
+                resetFields();
+                setMode((m) => (m === "signup" ? "login" : "signup"));
+              }}
+            >
+              {mode === "signup" ? "Use existing account" : "New here? Sign up"}
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-sm">
@@ -94,6 +110,12 @@ const Auth = () => {
           {error && (
             <p className="text-xs font-semibold text-red-500" role="alert">
               {error}
+            </p>
+          )}
+
+          {success && (
+            <p className="text-xs font-semibold text-green-600" role="alert">
+              {success}
             </p>
           )}
 

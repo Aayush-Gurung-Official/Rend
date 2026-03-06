@@ -72,18 +72,29 @@ const Navbar = () => {
           </nav>
         )}
         <div className="flex items-center gap-2 md:gap-3">
-          <button
-            disabled
-            className="hidden text-sm font-medium text-slate-400 cursor-not-allowed md:inline"
-          >
-            Login
-          </button>
-          <Link
-            to="/dashboard"
-            className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-dark md:px-4 md:py-2 md:text-sm"
-          >
-            Dashboard
-          </Link>
+          {location.pathname === '/dashboard' ? (
+            <Link
+              to="/"
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-500 md:px-4 md:py-2 md:text-sm"
+            >
+              Back to Website
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/auth"
+                className="hidden text-sm font-medium text-slate-600 hover:text-primary md:inline"
+              >
+                Login
+              </Link>
+              <Link
+                to="/auth"
+                className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-dark md:px-4 md:py-2 md:text-sm"
+              >
+                Dashboard
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>
