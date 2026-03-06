@@ -30,7 +30,7 @@ const Navbar = () => {
           <img
             src={Logo}
             alt="Rend logo"
-            className="h-9 w-auto object-contain md:h-10"
+            className="-ml-2 h-9 w-auto object-contain md:h-10"
           />
           <div className="hidden leading-tight sm:block">
             <div className="text-base font-semibold text-slate-900 md:text-lg">Rend</div>
@@ -39,43 +39,45 @@ const Navbar = () => {
             </div>
           </div>
         </Link>
-        <nav className="hidden items-center gap-5 text-sm font-medium text-slate-600 md:flex">
-          <NavLink
-            to="/"
-            className={({ isActive }) =>
-              isActive ? "text-primary" : "hover:text-primary"
-            }
-          >
-            Find Homes
-          </NavLink>
-          <NavLink
-            to="/list-property"
-            className={({ isActive }) =>
-              isActive ? "text-primary" : "hover:text-primary"
-            }
-          >
-            List Property
-          </NavLink>
-          <button
-            onClick={() => handleSectionClick("services")}
-            className="transition hover:text-primary"
-          >
-            Services
-          </button>
-          <button
-            onClick={() => handleSectionClick("help")}
-            className="transition hover:text-primary"
-          >
-            Help
-          </button>
-        </nav>
+        {location.pathname !== '/dashboard' && (
+          <nav className="hidden items-center gap-5 text-sm font-medium text-slate-600 md:flex">
+            <NavLink
+              to="/"
+              className={({ isActive }) =>
+                isActive ? "text-primary" : "hover:text-primary"
+              }
+            >
+              Find Homes
+            </NavLink>
+            <NavLink
+              to="/list-property"
+              className={({ isActive }) =>
+                isActive ? "text-primary" : "hover:text-primary"
+              }
+            >
+              List Property
+            </NavLink>
+            <button
+              onClick={() => handleSectionClick("services")}
+              className="transition hover:text-primary"
+            >
+              Services
+            </button>
+            <button
+              onClick={() => handleSectionClick("help")}
+              className="transition hover:text-primary"
+            >
+              Help
+            </button>
+          </nav>
+        )}
         <div className="flex items-center gap-2 md:gap-3">
-          <Link
-            to="/auth"
-            className="hidden text-sm font-medium text-slate-600 hover:text-primary md:inline"
+          <button
+            disabled
+            className="hidden text-sm font-medium text-slate-400 cursor-not-allowed md:inline"
           >
             Login
-          </Link>
+          </button>
           <Link
             to="/dashboard"
             className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-dark md:px-4 md:py-2 md:text-sm"

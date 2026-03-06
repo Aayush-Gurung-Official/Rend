@@ -12,6 +12,12 @@ const signup = async (req, res, next) => {
         .json({ message: "Username and password are required" });
     }
 
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters long" });
+    }
+
     const existing = await User.findOne({ username });
     if (existing) {
       return res

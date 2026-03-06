@@ -5,9 +5,9 @@ import Footer from "./components/Footer.jsx";
 
 const App = () => {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col w-full">
       <Navbar />
-      <main className="mx-auto flex-1 w-full max-w-7xl px-4 pb-10 pt-6 md:px-8">
+      <main className="flex-1 w-full px-4 pb-10 pt-6 md:px-8">
         <Outlet />
       </main>
       <Footer />

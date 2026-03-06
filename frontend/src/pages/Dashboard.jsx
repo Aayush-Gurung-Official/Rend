@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { updateProfile } from "../services/authService.js";
 
 const Dashboard = () => {
@@ -11,16 +11,23 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("rendUser");
-    if (!stored) {
-      navigate("/auth", { replace: true });
-      return;
-    }
-    const parsed = JSON.parse(stored);
-    setUser(parsed);
+    // const stored = window.localStorage.getItem("rendUser");
+    // if (!stored) {
+    //   navigate("/auth", { replace: true });
+    //   return;
+    // }
+    // const parsed = JSON.parse(stored);
+    // setUser(parsed);
+    // setProfileForm({
+    //   username: parsed.username || "",
+    //   profileImage: parsed.profileImage || "",
+    // });
+    // Dummy user for now
+    const dummyUser = { id: "dummy", username: "Guest", profileImage: null };
+    setUser(dummyUser);
     setProfileForm({
-      username: parsed.username || "",
-      profileImage: parsed.profileImage || "",
+      username: dummyUser.username,
+      profileImage: dummyUser.profileImage || "",
     });
   }, [navigate]);
 
@@ -93,12 +100,12 @@ const Dashboard = () => {
           ))}
         </nav>
 
-        <button
-          onClick={handleLogout}
-          className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-red-400 hover:text-red-500"
+        <Link
+          to="/"
+          className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-500 text-center"
         >
-          Logout
-        </button>
+          Back to Website
+        </Link>
       </aside>
 
       <div className="flex-1 rounded-2xl bg-white p-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200">
