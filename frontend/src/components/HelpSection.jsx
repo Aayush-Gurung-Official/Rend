@@ -32,7 +32,7 @@ const HelpSection = () => {
       {helpItems.map((item) => (
         <div
           key={item.title}
-          className="group rounded-2xl bg-slate-900 p-5 text-slate-100 shadow-sm shadow-slate-900/20 ring-1 ring-slate-700 transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-primary/60"
+          className="group flex min-h-[160px] flex-col justify-between rounded-2xl bg-slate-900 p-5 text-slate-100 shadow-sm shadow-slate-900/20 ring-1 ring-slate-700 transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-primary/60"
         >
           <h3 className="mb-2 text-sm font-semibold">{item.title}</h3>
           <p className="text-xs text-slate-200/80">{item.description}</p>

@@ -32,7 +32,7 @@ const ServicesSection = () => {
       {services.map((s) => (
         <div
           key={s.title}
-          className="group rounded-2xl bg-white p-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200 transition-transform duration-200 hover:-translate-y-1 hover:shadow-md hover:ring-primary/40"
+          className="group flex min-h-[160px] flex-col justify-between rounded-2xl bg-white p-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200 transition-transform duration-200 hover:-translate-y-1 hover:shadow-md hover:ring-primary/40"
         >
           <h3 className="mb-2 text-sm font-semibold text-slate-900">
             {s.title}
