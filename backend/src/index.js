@@ -6,6 +6,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 
 const listingsRouter = require("./routes/listings");
+const authRouter = require("./routes/auth");
 const connectDB = require("./config/db");
 
 const app = express();
@@ -25,6 +26,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/listings", listingsRouter);
+app.use("/api/auth", authRouter);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });

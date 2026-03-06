@@ -25,7 +25,7 @@ const Navbar = () => {
 
   return (
     <header className="w-full border-b border-slate-200 bg-white/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-8 md:py-4">
         <Link to="/" className="flex items-center gap-3">
           <img
             src={Logo}
@@ -70,12 +70,18 @@ const Navbar = () => {
           </button>
         </nav>
         <div className="flex items-center gap-2 md:gap-3">
-          <button className="hidden text-sm font-medium text-slate-600 hover:text-primary md:inline">
+          <Link
+            to="/auth"
+            className="hidden text-sm font-medium text-slate-600 hover:text-primary md:inline"
+          >
             Login
-          </button>
-          <button className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-dark md:px-4 md:py-2 md:text-sm">
-ort             Sign up
-          </button>
+          </Link>
+          <Link
+            to="/dashboard"
+            className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-dark md:px-4 md:py-2 md:text-sm"
+          >
+            Dashboard
+          </Link>
         </div>
       </div>
     </header>

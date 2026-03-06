@@ -1,6 +1,8 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const ListingsGrid = ({ listings, loading }) => {
+  const navigate = useNavigate();
   if (loading) {
     return (
       <div className="mt-6 text-sm text-slate-500">Loading homes in Nepal…</div>
@@ -55,7 +57,10 @@ const ListingsGrid = ({ listings, loading }) => {
               <div className="text-sm font-bold text-primary">
                 NPR {home.price.toLocaleString()}
               </div>
-              <button className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-primary hover:text-primary">
+              <button
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-primary hover:text-primary"
+                onClick={() => navigate(`/listing/${home.id}`)}
+              >
                 View details
               </button>
             </div>
