@@ -304,7 +304,7 @@ const Dashboard = () => {
             ))
           :
             // User navigation - only tenant-relevant items
-            ["home", "chat", "profile", "settings"].map((key) => (
+            ["home", "pay-rent", "maintenance", "lease", "contact", "chat", "profile", "settings"].map((key) => (
               <button
                 key={key}
                 onClick={() => {
@@ -319,6 +319,10 @@ const Dashboard = () => {
               >
                 <span>
                   {key === "home" ? "Dashboard home" : 
+                   key === "pay-rent" ? "Pay Rent" :
+                   key === "maintenance" ? "Request Maintenance" :
+                   key === "lease" ? "Lease Agreement" :
+                   key === "contact" ? "Contact Landlord" :
                    key === "chat" ? "Chat" :
                    key === "profile" ? "Profile" :
                    key === "settings" ? "Settings" : key}
@@ -554,37 +558,6 @@ const Dashboard = () => {
                         <span className="text-sm font-bold text-green-600">NPR 25,000</span>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Quick Actions for User */}
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
-                  <h3 className="text-lg font-bold mb-4">Quick Actions</h3>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <button 
-                      onClick={() => setActive('pay-rent')}
-                      className="bg-white text-blue-600 font-semibold py-2 px-4 rounded-lg hover:bg-gray-100 transition-colors"
-                    >
-                      Pay Rent Now
-                    </button>
-                    <button 
-                      onClick={() => setActive('maintenance')}
-                      className="bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-colors"
-                    >
-                      Request Maintenance
-                    </button>
-                    <button 
-                      onClick={() => setActive('lease')}
-                      className="bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-colors"
-                    >
-                      View Lease Agreement
-                    </button>
-                    <button 
-                      onClick={() => setActive('contact')}
-                      className="bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-colors"
-                    >
-                      Contact Landlord
-                    </button>
                   </div>
                 </div>
               </div>
@@ -862,6 +835,114 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {active === "profile" && (
+          <div className="max-w-2xl mx-auto p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Edit Profile</h2>
+
+            <div className="flex flex-col items-center mb-8">
+              <div className="relative group">
+                {/* Profile Image Container */}
+                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center">
+                  {profileImagePreview ? (
+                    <img src={profileImagePreview} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  )}
+                </div>
+
+                {/* Camera Button Overlay */}
+                <button
+                  onClick={handleCameraClick}
+                  className="absolute bottom-1 right-1 bg-primary p-2 rounded-full text-white hover:bg-primary/90 transition-colors shadow-lg"
+                  title="Upload Photo"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+              </div>
+              <p className="mt-2 text-sm text-gray-500">Click camera to update photo</p>
+            </div>
+
+            {/* Form Fields */}
+            <form onSubmit={handleProfileSave} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                  <input 
+                    type="text" 
+                    value={profileForm.username}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, username: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  <input 
+                    type="text" 
+                    value={profileForm.fullName}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, fullName: e.target.value }))}
+                    placeholder="Sarah J. Miller"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                  <input 
+                    type="email" 
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="sarah@example.com"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                <textarea 
+                  rows="3"
+                  value={profileForm.bio}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
+                  placeholder="Tell us about yourself..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setActive('home')}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={saving}
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 shadow-md transition disabled:opacity-70"
+                >
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
@@ -1453,69 +1534,162 @@ const Dashboard = () => {
               </header>
               
               <div className="flex-1 overflow-y-auto p-6">
-                <div className="max-w-4xl mx-auto space-y-6">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-900 mb-3">Active Tenants</h3>
-                    <div className="space-y-3">
-                      <div className="bg-white rounded-lg p-3 border border-blue-100">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">Rajesh Kumar</p>
-                            <p className="text-sm text-gray-600">Unit A-101 • NPR 25,000/month</p>
-                            <p className="text-xs text-gray-500">Lease ends: Dec 2024</p>
-                          </div>
-                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Active</span>
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 border border-blue-100">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">Sita Sharma</p>
-                            <p className="text-sm text-gray-600">Unit B-205 • NPR 18,000/month</p>
-                            <p className="text-xs text-gray-500">Lease ends: Jun 2024</p>
-                          </div>
-                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Active</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-yellow-900 mb-3">Pending Applications</h3>
-                    <div className="space-y-3">
-                      <div className="bg-white rounded-lg p-3 border border-yellow-100">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">Amit Singh</p>
-                            <p className="text-sm text-gray-600">Unit C-301 • Applied 2 days ago</p>
-                            <p className="text-xs text-gray-500">Requesting: NPR 22,000/month</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button className="bg-green-600 text-white px-3 py-1 rounded text-sm">Approve</button>
-                            <button className="bg-red-600 text-white px-3 py-1 rounded text-sm">Reject</button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-red-900 mb-3">Overdue Payments</h3>
-                    <div className="bg-white rounded-lg p-3 border border-red-100">
-                      <div className="flex justify-between items-center">
+                <div className="max-w-6xl mx-auto">
+                  {/* Stats Overview */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">Prem Bahadur</p>
-                          <p className="text-sm text-gray-600">Unit D-102 • 15 days overdue</p>
-                          <p className="text-xs text-gray-500">Amount: NPR 15,000</p>
+                          <p className="text-blue-100 text-sm">Total Tenants</p>
+                          <p className="text-3xl font-bold">24</p>
                         </div>
-                        <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">Overdue</span>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-green-100 text-sm">Active Leases</p>
+                          <p className="text-3xl font-bold">18</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-yellow-100 text-sm">Pending</p>
+                          <p className="text-3xl font-bold">6</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-purple-100 text-sm">Occupancy Rate</p>
+                          <p className="text-3xl font-bold">92%</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  
-                  <button className="w-full bg-primary text-white px-4 py-3 rounded-lg hover:bg-primary/90">
-                    + Add New Tenant
-                  </button>
+
+                  {/* Active Tenants */}
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden mb-8">
+                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4 border-b border-blue-200">
+                      <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Active Tenants
+                      </h3>
+                    </div>
+                    <div className="divide-y divide-gray-200">
+                      {[
+                        { name: 'Rajesh Kumar', unit: 'Unit A-101', rent: '25,000', lease: 'Dec 2024', status: 'active', payment: 'paid' },
+                        { name: 'Sita Sharma', unit: 'Unit B-205', rent: '18,000', lease: 'Jun 2024', status: 'active', payment: 'paid' },
+                        { name: 'Amit Singh', unit: 'Unit C-301', rent: '22,000', lease: 'Sep 2024', status: 'active', payment: 'pending' }
+                      ].map((tenant, index) => (
+                        <div key={index} className="p-6 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                                {tenant.name.split(' ').map(n => n[0]).join('')}
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-gray-900">{tenant.name}</h4>
+                                <p className="text-sm text-gray-600">{tenant.unit} • NPR {tenant.rent}/month</p>
+                                <div className="flex items-center gap-4 mt-1">
+                                  <span className="text-xs text-gray-500">Lease ends: {tenant.lease}</span>
+                                  <span className={`text-xs px-2 py-1 rounded-full ${
+                                    tenant.payment === 'paid' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                    {tenant.payment === 'paid' ? 'Paid' : 'Pending'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                                Contact
+                              </button>
+                              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+                                View Details
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pending Applications */}
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                    <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 px-6 py-4 border-b border-yellow-200">
+                      <h3 className="text-xl font-bold text-yellow-900 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        Pending Applications
+                      </h3>
+                    </div>
+                    <div className="divide-y divide-gray-200">
+                      {[
+                        { name: 'Amit Singh', unit: 'Unit C-301', applied: '2 days ago', requested: '22,000', score: '85' },
+                        { name: 'Priya Patel', unit: 'Unit D-402', applied: '5 days ago', requested: '20,000', score: '92' }
+                      ].map((application, index) => (
+                        <div key={index} className="p-6 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center text-white font-bold">
+                                {application.name.split(' ').map(n => n[0]).join('')}
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-gray-900">{application.name}</h4>
+                                <p className="text-sm text-gray-600">{application.unit} • Applied {application.applied}</p>
+                                <div className="flex items-center gap-4 mt-1">
+                                  <span className="text-xs text-gray-500">Requesting: NPR {application.requested}/month</span>
+                                  <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                                    Score: {application.score}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                                Approve
+                              </button>
+                              <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                                Reject
+                              </button>
+                              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+                                Review
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </main>
@@ -1542,63 +1716,149 @@ const Dashboard = () => {
               </header>
               
               <div className="flex-1 overflow-y-auto p-6">
-                <div className="max-w-4xl mx-auto space-y-6">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-green-900 mb-3">Published Listings</h3>
-                    <div className="space-y-3">
-                      <div className="bg-white rounded-lg p-4 border border-green-100">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-lg">Modern 2BHK Apartment</h4>
-                            <p className="text-gray-600">Thamel, Kathmandu • 800 sqft</p>
-                            <p className="text-2xl font-bold text-green-600">NPR 25,000/month</p>
-                            <div className="flex gap-2 mt-2">
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">2 Beds</span>
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">1 Bath</span>
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Furnished</span>
-                            </div>
-                          </div>
-                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Active</span>
+                <div className="max-w-7xl mx-auto">
+                  {/* Stats Overview */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-green-100 text-sm">Total Listings</p>
+                          <p className="text-3xl font-bold">12</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 border border-green-100">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-lg">Cozy Studio Room</h4>
-                            <p className="text-gray-600">Patan, Lalitpur • 400 sqft</p>
-                            <p className="text-2xl font-bold text-green-600">NPR 15,000/month</p>
-                            <div className="flex gap-2 mt-2">
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Studio</span>
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">1 Bath</span>
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Unfurnished</span>
-                            </div>
-                          </div>
-                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Active</span>
+                    </div>
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-blue-100 text-sm">Published</p>
+                          <p className="text-3xl font-bold">8</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-yellow-100 text-sm">Drafts</p>
+                          <p className="text-3xl font-bold">3</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-purple-100 text-sm">Views Today</p>
+                          <p className="text-3xl font-bold">247</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
                         </div>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-3">Draft Listings</h3>
-                    <div className="bg-white rounded-lg p-4 border border-gray-100">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-lg">Luxury Villa</h4>
-                          <p className="text-gray-600">Baluwatar, Kathmandu • 2,500 sqft</p>
-                          <p className="text-2xl font-bold text-gray-600">NPR 80,000/month</p>
-                          <div className="flex gap-2 mt-2">
-                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">4 Beds</span>
-                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">3 Baths</span>
-                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">Fully Furnished</span>
+
+                  {/* Published Listings */}
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden mb-8">
+                    <div className="bg-gradient-to-r from-green-50 to-green-100 px-6 py-4 border-b border-green-200">
+                      <h3 className="text-xl font-bold text-green-900 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Published Listings
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                      {[
+                        { title: 'Modern 2BHK Apartment', location: 'Thamel, Kathmandu', sqft: '800', price: '25,000', beds: '2', baths: '1', furnished: 'Furnished', image: 'apartment' },
+                        { title: 'Cozy Studio Room', location: 'Patan, Lalitpur', sqft: '400', price: '15,000', beds: 'Studio', baths: '1', furnished: 'Unfurnished', image: 'studio' },
+                        { title: 'Luxury Villa', location: 'Baluwatar, Kathmandu', sqft: '2500', price: '80,000', beds: '4', baths: '3', furnished: 'Fully Furnished', image: 'villa' }
+                      ].map((property, index) => (
+                        <div key={index} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+                          <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                            <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                          </div>
+                          <div className="p-4">
+                            <h4 className="font-semibold text-lg text-gray-900 mb-2">{property.title}</h4>
+                            <p className="text-sm text-gray-600 mb-3">{property.location} • {property.sqft} sqft</p>
+                            <p className="text-2xl font-bold text-green-600 mb-3">NPR {property.price}/month</p>
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">{property.beds} Beds</span>
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">{property.baths} Baths</span>
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">{property.furnished}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                                Edit
+                              </button>
+                              <button className="flex-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+                                View
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">Draft</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Draft Listings */}
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden mb-8">
+                    <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 px-6 py-4 border-b border-yellow-200">
+                      <h3 className="text-xl font-bold text-yellow-900 flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Draft Listings
+                      </h3>
+                    </div>
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[
+                          { title: 'Penthouse Suite', location: 'Jawalakhel, Patan', sqft: '1200', price: '45,000', beds: '3', baths: '2', furnished: 'Semi-Furnished' }
+                        ].map((property, index) => (
+                          <div key={index} className="bg-gray-50 border border-gray-200 rounded-xl p-4 opacity-75">
+                            <h4 className="font-semibold text-lg text-gray-700 mb-2">{property.title}</h4>
+                            <p className="text-sm text-gray-600 mb-3">{property.location} • {property.sqft} sqft</p>
+                            <p className="text-xl font-bold text-gray-600 mb-3">NPR {property.price}/month</p>
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs">{property.beds} Beds</span>
+                              <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs">{property.baths} Baths</span>
+                              <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs">{property.furnished}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="flex-1 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium">
+                                Continue Editing
+                              </button>
+                              <button className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                  
-                  <button className="w-full bg-primary text-white px-4 py-3 rounded-lg hover:bg-primary/90">
+
+                  {/* Add New Listing Button */}
+                  <button className="w-full bg-gradient-to-r from-primary to-primary-dark text-white px-6 py-4 rounded-xl hover:from-primary-dark hover:to-primary font-semibold text-lg shadow-lg transition-all transform hover:scale-[1.02]">
                     + Add New Listing
                   </button>
                 </div>
@@ -1627,92 +1887,190 @@ const Dashboard = () => {
               </header>
               
               <div className="flex-1 overflow-y-auto p-6">
-                <div className="max-w-4xl mx-auto space-y-6">
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-purple-900 mb-3">Monthly Summary</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="bg-white rounded-lg p-3 border border-purple-100">
-                        <p className="text-sm text-gray-600">Total Income</p>
-                        <p className="text-2xl font-bold text-green-600">NPR 43,000</p>
-                        <p className="text-xs text-green-600">↑ 12% from last month</p>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 border border-purple-100">
-                        <p className="text-sm text-gray-600">Expenses</p>
-                        <p className="text-2xl font-bold text-red-600">NPR 8,500</p>
-                        <p className="text-xs text-red-600">↑ 5% from last month</p>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 border border-purple-100">
-                        <p className="text-sm text-gray-600">Net Profit</p>
-                        <p className="text-2xl font-bold text-blue-600">NPR 34,500</p>
-                        <p className="text-xs text-blue-600">↑ 15% from last month</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-900 mb-3">Payment Status</h3>
-                    <div className="space-y-3">
-                      <div className="bg-white rounded-lg p-3 border border-blue-100">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">Rajesh Kumar</p>
-                            <p className="text-sm text-gray-600">March Rent - Unit A-101</p>
-                            <p className="text-xs text-gray-500">Paid on: March 1, 2024</p>
-                          </div>
-                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Paid</span>
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 border border-blue-100">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">Sita Sharma</p>
-                            <p className="text-sm text-gray-600">March Rent - Unit B-205</p>
-                            <p className="text-xs text-gray-500">Due: March 15, 2024</p>
-                          </div>
-                          <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">Pending</span>
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 border border-blue-100">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">Prem Bahadur</p>
-                            <p className="text-sm text-gray-600">March Rent - Unit D-102</p>
-                            <p className="text-xs text-gray-500">15 days overdue</p>
-                          </div>
-                          <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">Overdue</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-green-900 mb-3">Occupancy Rate</h3>
-                    <div className="bg-white rounded-lg p-4 border border-green-100">
-                      <div className="flex justify-between items-center mb-3">
-                        <p className="text-lg font-medium">Current Occupancy</p>
-                        <p className="text-3xl font-bold text-green-600">85%</p>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
-                        <div className="bg-green-600 h-3 rounded-full" style={{width: '85%'}}></div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="max-w-7xl mx-auto">
+                  {/* Stats Overview */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-gray-600">Occupied Units</p>
-                          <p className="font-medium">17 out of 20</p>
+                          <p className="text-green-100 text-sm">Total Income</p>
+                          <p className="text-3xl font-bold">NPR 43K</p>
+                          <p className="text-green-100 text-xs">↑ 12% from last month</p>
                         </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-gray-600">Vacant Units</p>
-                          <p className="font-medium">3 units</p>
+                          <p className="text-red-100 text-sm">Total Expenses</p>
+                          <p className="text-3xl font-bold">NPR 8.5K</p>
+                          <p className="text-red-100 text-xs">↑ 5% from last month</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-blue-100 text-sm">Net Profit</p>
+                          <p className="text-3xl font-bold">NPR 34.5K</p>
+                          <p className="text-blue-100 text-xs">↑ 15% from last month</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-purple-100 text-sm">Occupancy Rate</p>
+                          <p className="text-3xl font-bold">85%</p>
+                          <p className="text-purple-100 text-xs">17 out of 20 units</p>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-lg">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
                         </div>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="flex gap-3">
-                    <button className="flex-1 bg-primary text-white px-4 py-3 rounded-lg hover:bg-primary/90">
+
+                  {/* Revenue Chart */}
+                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-8">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-gray-900">Revenue Overview</h3>
+                      <select className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option>Last 6 Months</option>
+                        <option>Last Year</option>
+                        <option>All Time</option>
+                      </select>
+                    </div>
+                    <div className="h-64 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex items-center justify-center">
+                      <div className="text-center">
+                        <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <p className="text-gray-500">Revenue Chart Visualization</p>
+                        <p className="text-sm text-gray-400">Interactive chart showing monthly trends</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    {/* Payment Status */}
+                    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                      <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4 border-b border-blue-200">
+                        <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Recent Payments
+                        </h3>
+                      </div>
+                      <div className="divide-y divide-gray-200">
+                        {[
+                          { name: 'Rajesh Kumar', unit: 'Unit A-101', amount: '25,000', status: 'paid', date: 'March 1, 2024' },
+                          { name: 'Sita Sharma', unit: 'Unit B-205', amount: '18,000', status: 'pending', date: 'Due: March 15, 2024' },
+                          { name: 'Prem Bahadur', unit: 'Unit D-102', amount: '22,000', status: 'overdue', date: '15 days overdue' },
+                          { name: 'Amit Singh', unit: 'Unit C-301', amount: '20,000', status: 'paid', date: 'March 2, 2024' }
+                        ].map((payment, index) => (
+                          <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                                  payment.status === 'paid' ? 'bg-green-500' :
+                                  payment.status === 'pending' ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}>
+                                  {payment.name.split(' ').map(n => n[0]).join('')}
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-gray-900">{payment.name}</h4>
+                                  <p className="text-sm text-gray-600">{payment.unit}</p>
+                                  <p className="text-xs text-gray-500">{payment.date}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-gray-900">NPR {payment.amount}</p>
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  payment.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                  payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {payment.status === 'paid' ? 'Paid' : 
+                                   payment.status === 'pending' ? 'Pending' : 'Overdue'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Expense Breakdown */}
+                    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                      <div className="bg-gradient-to-r from-orange-50 to-orange-100 px-6 py-4 border-b border-orange-200">
+                        <h3 className="text-xl font-bold text-orange-900 flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          Expense Breakdown
+                        </h3>
+                      </div>
+                      <div className="p-6">
+                        <div className="space-y-4">
+                          {[
+                            { category: 'Maintenance', amount: '2,500', percentage: '29%' },
+                            { category: 'Utilities', amount: '1,800', percentage: '21%' },
+                            { category: 'Insurance', amount: '1,200', percentage: '14%' },
+                            { category: 'Property Tax', amount: '1,500', percentage: '18%' },
+                            { category: 'Other', amount: '1,500', percentage: '18%' }
+                          ].map((expense, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-4 h-4 bg-gradient-to-r from-orange-400 to-orange-600 rounded"></div>
+                                <span className="font-medium text-gray-900">{expense.category}</span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-500">{expense.percentage}</span>
+                                <span className="font-bold text-gray-900">NPR {expense.amount}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-6 pt-4 border-t border-gray-200">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-gray-900">Total Expenses</span>
+                            <span className="text-xl font-bold text-red-600">NPR 8,500</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-4">
+                    <button className="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-green-800 font-semibold shadow-lg transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
                       Download Full Report
                     </button>
-                    <button className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300">
+                    <button className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 font-semibold shadow-lg transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v1a1 1 0 001 1h4a1 1 0 001-1v-1m3-2V8a2 2 0 00-2-2H8a2 2 0 00-2 2v8m5-4h.01" />
+                      </svg>
                       Export to Excel
                     </button>
                   </div>
@@ -1909,6 +2267,18 @@ const AddPropertyForm = () => {
               <h3 className="font-bold text-gray-800 border-b pb-2">Property Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Listing Type</label>
+                  <select 
+                    value={propertyForm.listingType}
+                    onChange={(e) => handlePropertyFormChange('listingType', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option>For Rent</option>
+                    <option>For Sale</option>
+                    <option>For Both</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Property Type</label>
                   <select 
                     value={propertyForm.propertyType}
@@ -1918,31 +2288,35 @@ const AddPropertyForm = () => {
                     <option>Apartment</option>
                     <option>House</option>
                     <option>Studio</option>
-                    <option>Room</option>
+                    {propertyForm.listingType !== 'For Sale' && <option>Room</option>}
                     <option>Villa</option>
                     <option>Land</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Bedrooms</label>
-                  <input 
-                    type="number" 
-                    value={propertyForm.bedrooms}
-                    onChange={(e) => handlePropertyFormChange('bedrooms', e.target.value)}
-                    placeholder="2" 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Bathrooms</label>
-                  <input 
-                    type="number" 
-                    value={propertyForm.bathrooms}
-                    onChange={(e) => handlePropertyFormChange('bathrooms', e.target.value)}
-                    placeholder="1.5" 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                  />
-                </div>
+                {propertyForm.listingType !== 'For Sale' && propertyForm.propertyType !== 'Land' && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Bedrooms</label>
+                    <input 
+                      type="number" 
+                      value={propertyForm.bedrooms}
+                      onChange={(e) => handlePropertyFormChange('bedrooms', e.target.value)}
+                      placeholder="2" 
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                    />
+                  </div>
+                )}
+                {propertyForm.listingType !== 'For Sale' && propertyForm.propertyType !== 'Land' && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Bathrooms</label>
+                    <input 
+                      type="number" 
+                      value={propertyForm.bathrooms}
+                      onChange={(e) => handlePropertyFormChange('bathrooms', e.target.value)}
+                      placeholder="1.5" 
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Square Footage</label>
                   <input 
@@ -1953,26 +2327,42 @@ const AddPropertyForm = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Monthly Rent (NPR)</label>
-                  <input 
-                    type="number" 
-                    value={propertyForm.monthlyRent}
-                    onChange={(e) => handlePropertyFormChange('monthlyRent', e.target.value)}
-                    placeholder="1850" 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Security Deposit (NPR)</label>
-                  <input 
-                    type="number" 
-                    value={propertyForm.securityDeposit}
-                    onChange={(e) => handlePropertyFormChange('securityDeposit', e.target.value)}
-                    placeholder="2000" 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                  />
-                </div>
+                {(propertyForm.listingType === 'For Rent' || propertyForm.listingType === 'For Both') && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Monthly Rent (NPR)</label>
+                    <input 
+                      type="number" 
+                      value={propertyForm.monthlyRent}
+                      onChange={(e) => handlePropertyFormChange('monthlyRent', e.target.value)}
+                      placeholder="1850" 
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                    />
+                  </div>
+                )}
+                {(propertyForm.listingType === 'For Rent' || propertyForm.listingType === 'For Both') && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Security Deposit (NPR)</label>
+                    <input 
+                      type="number" 
+                      value={propertyForm.securityDeposit}
+                      onChange={(e) => handlePropertyFormChange('securityDeposit', e.target.value)}
+                      placeholder="2000" 
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                    />
+                  </div>
+                )}
+                {(propertyForm.listingType === 'For Sale' || propertyForm.listingType === 'For Both') && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Sale Price (NPR)</label>
+                    <input 
+                      type="number" 
+                      value={propertyForm.salePrice}
+                      onChange={(e) => handlePropertyFormChange('salePrice', e.target.value)}
+                      placeholder="5000000" 
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1987,38 +2377,65 @@ const AddPropertyForm = () => {
                   />
                 </div>
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lease Terms</label>
-                    <div className="flex gap-2">
-                       <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-100 cursor-pointer">
-                         {propertyForm.leaseTerms}
-                       </span>
-                       <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold cursor-pointer hover:bg-gray-200">
-                         Pet Friendly
-                       </span>
+                  {(propertyForm.listingType === 'For Rent' || propertyForm.listingType === 'For Both') && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lease Terms</label>
+                      <div className="flex gap-2">
+                         <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-100 cursor-pointer">
+                           {propertyForm.leaseTerms}
+                         </span>
+                         <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold cursor-pointer hover:bg-gray-200">
+                           Pet Friendly
+                         </span>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Utilities Included</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['Water', 'Trash', 'Gas', 'Electric'].map(utility => (
-                        <label key={utility} className="flex items-center gap-2 text-sm text-gray-600">
+                  )}
+                  {(propertyForm.listingType === 'For Rent' || propertyForm.listingType === 'For Both') && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Utilities Included</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Water', 'Trash', 'Gas', 'Electric'].map(utility => (
+                          <label key={utility} className="flex items-center gap-2 text-sm text-gray-600">
+                            <input 
+                              type="checkbox" 
+                              checked={propertyForm.utilities.includes(utility)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  handlePropertyFormChange('utilities', [...propertyForm.utilities, utility]);
+                                } else {
+                                  handlePropertyFormChange('utilities', propertyForm.utilities.filter(u => u !== utility));
+                                }
+                              }}
+                              className="rounded text-emerald-600 focus:ring-emerald-500" 
+                            /> {utility}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(propertyForm.listingType === 'For Sale' || propertyForm.listingType === 'For Both') && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Sale Information</label>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm text-gray-600">
                           <input 
                             type="checkbox" 
-                            checked={propertyForm.utilities.includes(utility)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                handlePropertyFormChange('utilities', [...propertyForm.utilities, utility]);
-                              } else {
-                                handlePropertyFormChange('utilities', propertyForm.utilities.filter(u => u !== utility));
-                              }
-                            }}
+                            checked={propertyForm.furnished === 'Fully Furnished'}
+                            onChange={(e) => handlePropertyFormChange('furnished', e.target.checked ? 'Fully Furnished' : 'Unfurnished')}
                             className="rounded text-emerald-600 focus:ring-emerald-500" 
-                          /> {utility}
+                          /> Fully Furnished
                         </label>
-                      ))}
+                        <label className="flex items-center gap-2 text-sm text-gray-600">
+                          <input 
+                            type="checkbox" 
+                            defaultChecked={propertyForm.parking !== 'None'}
+                            onChange={(e) => handlePropertyFormChange('parking', e.target.checked ? '1 Car' : 'None')}
+                            className="rounded text-emerald-600 focus:ring-emerald-500" 
+                          /> Parking Available
+                        </label>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
