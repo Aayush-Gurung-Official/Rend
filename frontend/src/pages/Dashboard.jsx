@@ -17,24 +17,63 @@ const Dashboard = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [propertyUpdates, setPropertyUpdates] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [showAddProperty, setShowAddProperty] = useState(false);
   const [propertyImages, setPropertyImages] = useState([]);
+  const [listings, setListings] = useState([]);
+  const [tenants, setTenants] = useState([
+    {
+      id: 1,
+      name: 'Raj Kumar',
+      property: 'Modern Thamel Apartment',
+      unit: 'Unit 3B',
+      rent: 'NPR 35,000',
+      dueDate: '2024-03-15',
+      status: 'Paid',
+      contact: '9841234567',
+      email: 'raj.kumar@email.com'
+    },
+    {
+      id: 2,
+      name: 'Sita Sharma',
+      property: 'Cozy Boudha House',
+      unit: 'Unit 1A',
+      rent: 'NPR 45,000',
+      dueDate: '2024-03-10',
+      status: 'Pending',
+      contact: '9849876543',
+      email: 'sita.sharma@email.com'
+    }
+  ]);
+
+  // Initialize listings from localStorage
+  useEffect(() => {
+    const storedProperties = JSON.parse(localStorage.getItem('properties') || '[]');
+    setListings(storedProperties);
+  }, []);
   const [propertyForm, setPropertyForm] = useState({
     name: '',
     address: '',
     city: '',
     state: '',
     zipCode: '',
-    type: 'Apartment',
+    listingType: 'For Rent', // For Rent, For Sale, For Both
+    propertyType: 'Apartment',
     bedrooms: '',
     bathrooms: '',
     squareFootage: '',
     monthlyRent: '',
     securityDeposit: '',
+    salePrice: '',
     description: '',
     leaseTerms: ['12 Months'],
     utilities: [],
-    amenities: []
+    amenities: [],
+    furnished: 'Unfurnished',
+    parking: 'None',
+    floorNumber: '',
+    totalFloors: '',
+    yearBuilt: '',
+    facingDirection: '',
+    nearbyPlaces: ''
   });
   const [profileForm, setProfileForm] = useState({ 
     username: "", 
@@ -135,13 +174,21 @@ const Dashboard = () => {
       images: propertyImages,
       id: Date.now(),
       ownerId: user.id,
-      createdAt: new Date().toISOString()
+      ownerName: user.username,
+      createdAt: new Date().toISOString(),
+      status: 'Active',
+      featured: false,
+      views: 0,
+      inquiries: 0
     };
     
     // Get existing properties or create empty array
     const existingProperties = JSON.parse(localStorage.getItem('properties') || '[]');
     existingProperties.push(newProperty);
     localStorage.setItem('properties', JSON.stringify(existingProperties));
+    
+    // Update listings state
+    setListings(existingProperties);
     
     // Reset form and close
     setPropertyForm({
@@ -150,16 +197,25 @@ const Dashboard = () => {
       city: '',
       state: '',
       zipCode: '',
-      type: 'Apartment',
+      listingType: 'For Rent',
+      propertyType: 'Apartment',
       bedrooms: '',
       bathrooms: '',
       squareFootage: '',
       monthlyRent: '',
       securityDeposit: '',
+      salePrice: '',
       description: '',
       leaseTerms: ['12 Months'],
       utilities: [],
-      amenities: []
+      amenities: [],
+      furnished: 'Unfurnished',
+      parking: 'None',
+      floorNumber: '',
+      totalFloors: '',
+      yearBuilt: '',
+      facingDirection: '',
+      nearbyPlaces: ''
     });
     setPropertyImages([]);
     setShowAddProperty(false);
@@ -219,19 +275,57 @@ const Dashboard = () => {
         </div>
 
         <nav className="space-y-1 text-sm">
-          {["home", "chat", "profile", "settings"].map((key) => (
-            <button
-              key={key}
-              onClick={() => setActive(key)}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left capitalize ${
-                active === key
-                  ? "bg-primary/10 text-primary"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <span>{key === "home" ? "Dashboard home" : key}</span>
-            </button>
-          ))}
+          {userType === "owner" ? 
+            // Owner navigation - includes property management
+            ["home", "add-property", "manage-tenants", "view-listings", "financial-reports", "chat", "profile", "settings"].map((key) => (
+              <button
+                key={key}
+                onClick={() => {
+                  // Set active state for all quick actions instead of navigation
+                  setActive(key);
+                }}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left capitalize ${
+                  active === key
+                    ? "bg-primary/10 text-primary"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <span>
+                  {key === "home" ? "Dashboard home" : 
+                   key === "add-property" ? "Add Property" :
+                   key === "manage-tenants" ? "Manage Tenants" :
+                   key === "view-listings" ? "View Listings" :
+                   key === "financial-reports" ? "Financial Reports" :
+                   key === "chat" ? "Chat" :
+                   key === "profile" ? "Profile" :
+                   key === "settings" ? "Settings" : key}
+                </span>
+              </button>
+            ))
+          :
+            // User navigation - only tenant-relevant items
+            ["home", "chat", "profile", "settings"].map((key) => (
+              <button
+                key={key}
+                onClick={() => {
+                  // Set active state for all quick actions instead of navigation
+                  setActive(key);
+                }}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left capitalize ${
+                  active === key
+                    ? "bg-primary/10 text-primary"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <span>
+                  {key === "home" ? "Dashboard home" : 
+                   key === "chat" ? "Chat" :
+                   key === "profile" ? "Profile" :
+                   key === "settings" ? "Settings" : key}
+                </span>
+              </button>
+            ))
+          }
         </nav>
       </aside>
 
@@ -282,7 +376,7 @@ const Dashboard = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-slate-600">Monthly Revenue</p>
-                        <p className="text-2xl font-bold text-slate-900">₹2.4L</p>
+                        <p className="text-2xl font-bold text-slate-900">NPR 2.4L</p>
                       </div>
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-100 text-yellow-600">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -307,64 +401,190 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h3>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <button 
-                      onClick={() => setShowAddProperty(true)}
-                      className="flex items-center justify-center rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark"
-                    >
-                      Add New Property
-                    </button>
-                    <button className="flex items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-300">
-                      View All Listings
-                    </button>
-                    <button className="flex items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-300">
-                      Manage Tenants
-                    </button>
-                    <button className="flex items-center justify-center rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-300">
-                      Financial Reports
-                    </button>
+                {/* Owner Specific Sections */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Properties</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">Modern Apartment</p>
+                          <p className="text-xs text-gray-600">Thamel, Kathmandu</p>
+                          <p className="text-sm font-bold text-green-600">NPR 25,000/month</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">Cozy Studio</p>
+                          <p className="text-xs text-gray-600">Patan, Lalitpur</p>
+                          <p className="text-sm font-bold text-green-600">NPR 15,000/month</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tenant Applications</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">Rajesh Kumar</p>
+                          <p className="text-xs text-gray-600">Applied for Unit A-101</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button className="bg-green-600 text-white px-3 py-1 rounded text-xs">Approve</button>
+                          <button className="bg-red-600 text-white px-3 py-1 rounded text-xs">Reject</button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">Sita Sharma</p>
+                          <p className="text-xs text-gray-600">Applied for Unit B-205</p>
+                        </div>
+                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">Pending</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="group space-y-4 rounded-3xl bg-white/80 p-4 shadow-sm shadow-slate-900/5 ring-1 ring-transparent transition hover:-translate-y-1 hover:bg-white hover:shadow-lg hover:ring-primary/30 md:p-6">
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
-                  Find your perfect home in <span className="text-primary">Nepal</span>
-                </h1>
-                <p className="text-sm text-slate-600 md:text-base">
-                  Browse verified houses, apartments and rooms to <span className="font-semibold">buy</span> or <span className="font-semibold">rent</span> across Kathmandu, Pokhara and growing cities in Nepal.
-                </p>
-                <div className="w-full rounded-2xl bg-white/95 p-4 shadow-lg shadow-slate-900/5 ring-1 ring-slate-200">
-                  <div className="mb-3 flex gap-2 text-xs font-semibold text-slate-500">
-                    <button className="rounded-full px-3 py-1 bg-primary text-white">Rent</button>
-                    <button className="rounded-full px-3 py-1 bg-slate-100 text-slate-600">Buy</button>
-                    <button className="rounded-full px-3 py-1 bg-slate-100 text-slate-600">List property</button>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-4">
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-500">Type</label>
-                      <select className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                        <option value="all">All</option>
-                        <option value="rent">Rent</option>
-                        <option value="buy">Buy</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-500">Location (City / Area)</label>
-                      <input type="text" placeholder="e.g. Kathmandu, Pokhara" className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm" value="" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-500">Budget (NPR)</label>
-                      <div className="flex gap-2">
-                        <input type="number" placeholder="Min" className="w-1/2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm" value="" />
-                        <input type="number" placeholder="Max" className="w-1/2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm" value="" />
+              // User Dashboard - Tenant View
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-xl font-semibold text-slate-900">
+                    Welcome back, {user.username || "tenant"} 👋
+                  </h1>
+                  <p className="text-sm text-slate-600">
+                    Manage your rented properties and payments.
+                  </p>
+                </div>
+                
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-slate-600">Current Rent</p>
+                        <p className="text-2xl font-bold text-slate-900">NPR 25,000</p>
+                      </div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
                       </div>
                     </div>
-                    <div className="flex flex-col justify-end">
-                      <button className="inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark">Search Homes</button>
+                  </div>
+                  
+                  <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-slate-600">Next Due Date</p>
+                        <p className="text-2xl font-bold text-slate-900">Mar 15</p>
+                      </div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
                     </div>
+                  </div>
+                  
+                  <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-slate-600">Payment Status</p>
+                        <p className="text-2xl font-bold text-slate-900">Paid</p>
+                      </div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-600">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* User Specific Sections */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">My Rented Properties</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">Modern Apartment</p>
+                          <p className="text-xs text-gray-600">Thamel, Kathmandu • Unit A-101</p>
+                          <p className="text-sm font-bold text-blue-600">NPR 25,000/month</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">Studio Room</p>
+                          <p className="text-xs text-gray-600">Patan, Lalitpur • Unit B-205</p>
+                          <p className="text-sm font-bold text-blue-600">NPR 18,000/month</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment History</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">March 2024</p>
+                          <p className="text-xs text-gray-600">Paid on March 1, 2024</p>
+                        </div>
+                        <span className="text-sm font-bold text-green-600">NPR 25,000</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">February 2024</p>
+                          <p className="text-xs text-gray-600">Paid on February 1, 2024</p>
+                        </div>
+                        <span className="text-sm font-bold text-green-600">NPR 25,000</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-sm">January 2024</p>
+                          <p className="text-xs text-gray-600">Paid on January 1, 2024</p>
+                        </div>
+                        <span className="text-sm font-bold text-green-600">NPR 25,000</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Actions for User */}
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
+                  <h3 className="text-lg font-bold mb-4">Quick Actions</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <button 
+                      onClick={() => setActive('pay-rent')}
+                      className="bg-white text-blue-600 font-semibold py-2 px-4 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      Pay Rent Now
+                    </button>
+                    <button 
+                      onClick={() => setActive('maintenance')}
+                      className="bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-colors"
+                    >
+                      Request Maintenance
+                    </button>
+                    <button 
+                      onClick={() => setActive('lease')}
+                      className="bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-colors"
+                    >
+                      View Lease Agreement
+                    </button>
+                    <button 
+                      onClick={() => setActive('contact')}
+                      className="bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-colors"
+                    >
+                      Contact Landlord
+                    </button>
                   </div>
                 </div>
               </div>
@@ -372,110 +592,276 @@ const Dashboard = () => {
           </div>
         )}
 
-        {active === "profile" && (
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Edit Profile</h2>
-
-            <div className="flex flex-col items-center mb-8">
-              <div className="relative group">
-                {/* Profile Image Container */}
-                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center">
-                  {profileImagePreview ? (
-                    <img src={profileImagePreview} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  )}
-                </div>
-
-                {/* Camera Button Overlay */}
-                <button
-                  onClick={handleCameraClick}
-                  className="absolute bottom-1 right-1 bg-primary p-2 rounded-full text-white hover:bg-primary/90 transition-colors shadow-lg"
-                  title="Upload Photo"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-
-                {/* Hidden File Input */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageChange}
-                  accept="image/*"
-                  className="hidden"
-                />
-              </div>
-              <p className="mt-2 text-sm text-gray-500">Click camera to update photo</p>
-            </div>
-
-            {/* Form Fields */}
-            <form onSubmit={handleProfileSave} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {active === "pay-rent" && (
+          <div className="max-w-4xl mx-auto p-6">
+            <div className="bg-white rounded-xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Pay Rent</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                  <input 
-                    type="text" 
-                    value={profileForm.username}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, username: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Month</h3>
+                  <div className="bg-blue-50 rounded-lg p-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-gray-600">March 2024 Rent</span>
+                      <span className="text-2xl font-bold text-blue-600">NPR 25,000</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-gray-600">Due Date</span>
+                      <span className="text-lg font-semibold text-orange-600">March 15, 2024</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Late Fee</span>
+                      <span className="text-lg font-semibold text-red-600">NPR 500/day</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                  <input 
-                    type="text" 
-                    value={profileForm.fullName}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, fullName: e.target.value }))}
-                    placeholder="Sarah J. Miller"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                  <input 
-                    type="email" 
-                    value={profileForm.email}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="sarah@example.com"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Method</h3>
+                  <div className="space-y-4">
+                    <div className="border rounded-lg p-4">
+                      <label className="flex items-center space-x-3 cursor-pointer">
+                        <input type="radio" name="payment" className="text-primary" />
+                        <span className="font-medium">Credit/Debit Card</span>
+                      </label>
+                    </div>
+                    <div className="border rounded-lg p-4">
+                      <label className="flex items-center space-x-3 cursor-pointer">
+                        <input type="radio" name="payment" className="text-primary" />
+                        <span className="font-medium">Bank Transfer</span>
+                      </label>
+                    </div>
+                    <div className="border rounded-lg p-4">
+                      <label className="flex items-center space-x-3 cursor-pointer">
+                        <input type="radio" name="payment" className="text-primary" />
+                        <span className="font-medium">Digital Wallet</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                <textarea 
-                  rows="3"
-                  value={profileForm.bio}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
-                  placeholder="Tell us about yourself..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button 
-                  type="button"
-                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-                >
+              <div className="mt-8 flex justify-end gap-4">
+                <button className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                   Cancel
                 </button>
-                <button 
-                  type="submit"
-                  disabled={saving}
-                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 shadow-md transition disabled:opacity-70"
-                >
-                  {saving ? "Saving..." : "Save Changes"}
+                <button className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 font-semibold">
+                  Pay NPR 25,000
                 </button>
               </div>
-            </form>
+            </div>
+          </div>
+        )}
+
+        {active === "maintenance" && (
+          <div className="max-w-4xl mx-auto p-6">
+            <div className="bg-white rounded-xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Request Maintenance</h2>
+              
+              <form className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Property</label>
+                  <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                    <option>Modern Apartment - Unit A-101</option>
+                    <option>Studio Room - Unit B-205</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Issue Type</label>
+                  <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                    <option>Plumbing</option>
+                    <option>Electrical</option>
+                    <option>HVAC</option>
+                    <option>Appliance</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                  <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary">
+                    <option>Emergency</option>
+                    <option>High</option>
+                    <option>Medium</option>
+                    <option>Low</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                  <textarea 
+                    rows="4" 
+                    placeholder="Please describe the maintenance issue in detail..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Date</label>
+                  <input 
+                    type="datetime-local" 
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setActive('home')}
+                    className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 font-semibold"
+                  >
+                    Submit Request
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {active === "lease" && (
+          <div className="max-w-4xl mx-auto p-6">
+            <div className="bg-white rounded-xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Lease Agreement</h2>
+              
+              <div className="space-y-6">
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Property Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Property Name</p>
+                      <p className="font-medium">Modern Apartment</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Unit</p>
+                      <p className="font-medium">A-101</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Address</p>
+                      <p className="font-medium">Thamel, Kathmandu</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Monthly Rent</p>
+                      <p className="font-medium text-blue-600">NPR 25,000</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Lease Terms</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Lease Start Date</span>
+                      <span className="font-medium">January 1, 2024</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Lease End Date</span>
+                      <span className="font-medium">December 31, 2024</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Security Deposit</span>
+                      <span className="font-medium text-green-600">NPR 50,000</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Notice Period</span>
+                      <span className="font-medium">30 days</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-center gap-4 mt-8">
+                  <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                    Download PDF
+                  </button>
+                  <button className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Print
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {active === "contact" && (
+          <div className="max-w-4xl mx-auto p-6">
+            <div className="bg-white rounded-xl shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Landlord</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Landlord Information</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-16 h-16 bg-gray-200 rounded-full"></div>
+                      <div>
+                        <p className="font-medium text-lg">Rajesh Kumar</p>
+                        <p className="text-sm text-gray-600">Property Owner</p>
+                        <p className="text-sm text-green-600">● Online</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8a7 7 0 00-7 7h14a7 7 0 007 7z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span className="text-sm">+977-987654321</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8a7 7 0 00-7 7h14a7 7 0 007 7z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span className="text-sm">rajesh.kumar@rent.com</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Send Message</h3>
+                  <form className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+                      <input 
+                        type="text" 
+                        placeholder="Enter subject..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                      <textarea 
+                        rows="4" 
+                        placeholder="Type your message here..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary"
+                      ></textarea>
+                    </div>
+                    <div className="flex justify-end gap-4">
+                      <button 
+                        type="button"
+                        onClick={() => setActive('home')}
+                        className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        type="submit"
+                        className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 font-semibold"
+                      >
+                        Send Message
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -637,7 +1023,7 @@ const Dashboard = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium text-gray-700">Email Notifications</p>
-                          <p className="text-sm text-gray-500">Receive updates via email</p>
+                          <p className="text-sm text-gray-500">Receive property updates and alerts via email</p>
                         </div>
                         <button 
                           onClick={() => setEmailNotifications(!emailNotifications)}
@@ -649,13 +1035,141 @@ const Dashboard = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium text-gray-700">Property Updates</p>
-                          <p className="text-sm text-gray-500">Get notified about new properties</p>
+                          <p className="text-sm text-gray-500">Get notified about new matching properties</p>
                         </div>
                         <button 
                           onClick={() => setPropertyUpdates(!propertyUpdates)}
                           className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${propertyUpdates ? 'bg-primary' : 'bg-gray-300'}`}
                         >
                           <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${propertyUpdates ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-700">Payment Reminders</p>
+                          <p className="text-sm text-gray-500">Receive rent payment due date reminders</p>
+                        </div>
+                        <button 
+                          onClick={() => setPropertyUpdates(!propertyUpdates)}
+                          className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${propertyUpdates ? 'bg-primary' : 'bg-gray-300'}`}
+                        >
+                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${propertyUpdates ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-700">Marketing Communications</p>
+                          <p className="text-sm text-gray-500">Receive promotional offers and newsletters</p>
+                        </div>
+                        <button className="w-12 h-6 rounded-full p-1 bg-gray-300 transition-colors duration-300">
+                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300" />
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {settingsActiveTab === 'Account' && (
+                  <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+                    <h3 className="text-md font-bold text-gray-800 mb-4">Account Information</h3>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Account Type</label>
+                          <select className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50">
+                            <option>Property Owner</option>
+                            <option>Tenant</option>
+                            <option>Agent</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Member Since</label>
+                          <input type="text" value="March 2024" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                          <input type="tel" placeholder="+977-98xxxxxxxx" className="w-full p-2 border border-gray-300 rounded-lg" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+                          <input type="date" className="w-full p-2 border border-gray-300 rounded-lg" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                        <textarea rows="3" placeholder="Your complete address" className="w-full p-2 border border-gray-300 rounded-lg"></textarea>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {settingsActiveTab === 'Privacy' && (
+                  <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+                    <h3 className="text-md font-bold text-gray-800 mb-4">Privacy Settings</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-700">Profile Visibility</p>
+                          <p className="text-sm text-gray-500">Make your profile visible to other users</p>
+                        </div>
+                        <button className="w-12 h-6 rounded-full p-1 bg-primary transition-colors duration-300">
+                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 translate-x-6" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-700">Show Contact Information</p>
+                          <p className="text-sm text-gray-500">Display your email and phone to property owners</p>
+                        </div>
+                        <button className="w-12 h-6 rounded-full p-1 bg-gray-300 transition-colors duration-300">
+                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-700">Data Sharing</p>
+                          <p className="text-sm text-gray-500">Share anonymous usage data to improve our services</p>
+                        </div>
+                        <button className="w-12 h-6 rounded-full p-1 bg-gray-300 transition-colors duration-300">
+                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300" />
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {settingsActiveTab === 'Billing' && (
+                  <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+                    <h3 className="text-md font-bold text-gray-800 mb-4">Billing & Subscription</h3>
+                    <div className="space-y-4">
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-semibold text-gray-800">Current Plan: Free</h4>
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">Active</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">List up to 3 properties, basic features included</p>
+                        <button className="bg-primary text-white px-4 py-2 rounded-lg text-sm hover:bg-primary/90 transition-colors">
+                          Upgrade to Premium
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-gray-700">Payment Methods</h4>
+                        <div className="border border-gray-200 rounded-lg p-3 flex justify-between items-center">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-6 bg-blue-600 rounded flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">VISA</span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">•••• •••• •••• 4242</p>
+                              <p className="text-xs text-gray-500">Expires 12/25</p>
+                            </div>
+                          </div>
+                          <button className="text-red-600 text-sm hover:text-red-700">Remove</button>
+                        </div>
+                        <button className="w-full border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                          + Add Payment Method
                         </button>
                       </div>
                     </div>
@@ -683,6 +1197,71 @@ const Dashboard = () => {
                 </div>
               </div>
             </main>
+          </div>
+        )}
+
+        {/* User Dashboard for Tenants */}
+        {userType === 'user' && active === "home" && (
+          <div className="p-6 space-y-6">
+            <h1 className="text-2xl font-bold text-gray-900">My Dashboard</h1>
+            
+            {/* Rent Payment Section */}
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
+              <h2 className="text-xl font-bold mb-4">💳 Rent Payment</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white/20 backdrop-blur rounded-lg p-4">
+                  <p className="text-blue-100 text-sm">Current Rent</p>
+                  <p className="text-2xl font-bold">NPR 25,000</p>
+                </div>
+                <div className="bg-white/20 backdrop-blur rounded-lg p-4">
+                  <p className="text-blue-100 text-sm">Due Date</p>
+                  <p className="text-2xl font-bold">March 15</p>
+                </div>
+                <div className="bg-white/20 backdrop-blur rounded-lg p-4">
+                  <p className="text-blue-100 text-sm">Status</p>
+                  <p className="text-2xl font-bold">Paid</p>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-3">
+                <button 
+                  onClick={() => navigate('/user-dashboard')}
+                  className="bg-white text-blue-600 font-semibold py-2 px-4 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  Pay Rent Now
+                </button>
+                <button 
+                  onClick={() => navigate('/user-dashboard')}
+                  className="bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-colors"
+                >
+                  Payment History
+                </button>
+              </div>
+            </div>
+
+            {/* My Properties */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">My Rented Properties</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="h-32 bg-gray-200 rounded-lg mb-4"></div>
+                  <h3 className="font-semibold text-gray-900">Modern Apartment</h3>
+                  <p className="text-sm text-gray-600">Thamel, Kathmandu</p>
+                  <p className="text-sm text-gray-500">2 beds • 1 bath • 800 sqft</p>
+                  <p className="text-lg font-bold text-primary mt-2">NPR 25,000/month</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Maintenance Requests */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Maintenance Requests</h2>
+              <button 
+                onClick={() => navigate('/user-dashboard')}
+                className="bg-primary text-white font-semibold py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                + New Request
+              </button>
+            </div>
           </div>
         )}
 
@@ -825,283 +1404,813 @@ const Dashboard = () => {
             </main>
           </div>
         )}
-
-        {/* Add Property Modal */}
-        {showAddProperty && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        
+        {active === "add-property" && (
+          <div className="flex h-screen bg-gray-100 font-sans">
+            {/* Add Property Form takes full right side */}
+            <main className="flex-1 flex flex-col bg-white">
               {/* Header */}
-              <div className="p-8 border-b border-gray-100">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-800 uppercase tracking-tight">Add New Property</h1>
-                    <p className="text-gray-500 mt-1">Create a detailed listing for your rental unit.</p>
+              <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Add New Property</h1>
+                  <p className="text-sm text-gray-600">Create a detailed listing for your property</p>
+                </div>
+                <button 
+                  onClick={() => setActive('home')}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </header>
+
+              {/* Form Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <AddPropertyForm />
+              </div>
+            </main>
+          </div>
+        )}
+        
+        {active === "manage-tenants" && (
+          <div className="flex h-screen bg-gray-100 font-sans">
+            {/* Manage Tenants Form takes full right side */}
+            <main className="flex-1 flex flex-col bg-white">
+              <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Manage Tenants</h1>
+                  <p className="text-sm text-gray-600">Handle tenant information and applications</p>
+                </div>
+                <button 
+                  onClick={() => setActive('home')}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </header>
+              
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-900 mb-3">Active Tenants</h3>
+                    <div className="space-y-3">
+                      <div className="bg-white rounded-lg p-3 border border-blue-100">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">Rajesh Kumar</p>
+                            <p className="text-sm text-gray-600">Unit A-101 • NPR 25,000/month</p>
+                            <p className="text-xs text-gray-500">Lease ends: Dec 2024</p>
+                          </div>
+                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Active</span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 border border-blue-100">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">Sita Sharma</p>
+                            <p className="text-sm text-gray-600">Unit B-205 • NPR 18,000/month</p>
+                            <p className="text-xs text-gray-500">Lease ends: Jun 2024</p>
+                          </div>
+                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Active</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <button 
-                    onClick={() => setShowAddProperty(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                  
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-yellow-900 mb-3">Pending Applications</h3>
+                    <div className="space-y-3">
+                      <div className="bg-white rounded-lg p-3 border border-yellow-100">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">Amit Singh</p>
+                            <p className="text-sm text-gray-600">Unit C-301 • Applied 2 days ago</p>
+                            <p className="text-xs text-gray-500">Requesting: NPR 22,000/month</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button className="bg-green-600 text-white px-3 py-1 rounded text-sm">Approve</button>
+                            <button className="bg-red-600 text-white px-3 py-1 rounded text-sm">Reject</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-red-900 mb-3">Overdue Payments</h3>
+                    <div className="bg-white rounded-lg p-3 border border-red-100">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">Prem Bahadur</p>
+                          <p className="text-sm text-gray-600">Unit D-102 • 15 days overdue</p>
+                          <p className="text-xs text-gray-500">Amount: NPR 15,000</p>
+                        </div>
+                        <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">Overdue</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button className="w-full bg-primary text-white px-4 py-3 rounded-lg hover:bg-primary/90">
+                    + Add New Tenant
                   </button>
                 </div>
               </div>
-
-              <form onSubmit={handlePropertySubmit} className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-10">
-                
-                {/* Left & Middle Column: Form Details */}
-                <div className="lg:col-span-2 space-y-8">
-                  
-                  {/* Top Section: Name and Map Placeholder */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Property Name</label>
-                        <input 
-                          type="text" 
-                          value={propertyForm.name}
-                          onChange={(e) => handlePropertyFormChange('name', e.target.value)}
-                          placeholder="The Willow Apartments - Unit 3B" 
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none transition-all" 
-                        />
-                      </div>
-                      <div className="relative">
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Address</label>
-                        <div className="relative">
-                          <input 
-                            type="text" 
-                            value={propertyForm.address}
-                            onChange={(e) => handlePropertyFormChange('address', e.target.value)}
-                            placeholder="123 Main St, Springfield" 
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg pr-10 focus:ring-2 focus:ring-primary outline-none" 
-                          />
-                          <svg className="absolute right-3 top-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        <input 
-                          type="text" 
-                          value={propertyForm.city}
-                          onChange={(e) => handlePropertyFormChange('city', e.target.value)}
-                          placeholder="City" 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                        />
-                        <input 
-                          type="text" 
-                          value={propertyForm.state}
-                          onChange={(e) => handlePropertyFormChange('state', e.target.value)}
-                          placeholder="State" 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                        />
-                        <input 
-                          type="text" 
-                          value={propertyForm.zipCode}
-                          onChange={(e) => handlePropertyFormChange('zipCode', e.target.value)}
-                          placeholder="Zip Code" 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                        />
-                      </div>
-                    </div>
-
-                    {/* Map Placeholder */}
-                    <div className="h-full min-h-[150px] bg-gray-100 rounded-xl border border-gray-200 overflow-hidden flex flex-col">
-                      <div className="bg-white p-2 border-b flex items-center gap-2">
-                         <svg className="text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                         </svg>
-                         <span className="text-xs text-gray-400">Search Map...</span>
-                      </div>
-                      <div className="flex-1 flex items-center justify-center text-gray-400 italic text-sm">
-                         <svg className="mb-1 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                         </svg>
-                         Google Maps Integration
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Middle Section: Specs */}
-                  <div className="space-y-6">
-                    <h3 className="font-bold text-gray-800 border-b pb-2">Property Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Property Type</label>
-                        <select 
-                          value={propertyForm.type}
-                          onChange={(e) => handlePropertyFormChange('type', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                        >
-                          <option>Apartment</option>
-                          <option>House</option>
-                          <option>Studio</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Bedrooms</label>
-                        <input 
-                          type="number" 
-                          value={propertyForm.bedrooms}
-                          onChange={(e) => handlePropertyFormChange('bedrooms', e.target.value)}
-                          placeholder="2" 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Bathrooms</label>
-                        <input 
-                          type="number" 
-                          value={propertyForm.bathrooms}
-                          onChange={(e) => handlePropertyFormChange('bathrooms', e.target.value)}
-                          placeholder="1.5" 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Square Footage</label>
-                        <input 
-                          type="number" 
-                          value={propertyForm.squareFootage}
-                          onChange={(e) => handlePropertyFormChange('squareFootage', e.target.value)}
-                          placeholder="1100" 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Monthly Rent (NPR)</label>
-                        <input 
-                          type="number" 
-                          value={propertyForm.monthlyRent}
-                          onChange={(e) => handlePropertyFormChange('monthlyRent', e.target.value)}
-                          placeholder="25000" 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Security Deposit (NPR)</label>
-                        <input 
-                          type="number" 
-                          value={propertyForm.securityDeposit}
-                          onChange={(e) => handlePropertyFormChange('securityDeposit', e.target.value)}
-                          placeholder="50000" 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Description</label>
-                        <textarea 
-                          rows="4" 
-                          value={propertyForm.description}
-                          onChange={(e) => handlePropertyFormChange('description', e.target.value)}
-                          placeholder="Enter your description here..." 
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" 
-                        />
-                      </div>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lease Terms</label>
-                          <div className="flex gap-2">
-                             <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold border border-primary/20 cursor-pointer">12 Months</span>
-                             <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold cursor-pointer hover:bg-gray-200">Pet Friendly</span>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Utilities Included</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {['Water', 'Trash', 'Gas', 'Electric'].map(u => (
-                              <label key={u} className="flex items-center gap-2 text-sm text-gray-600">
-                                <input type="checkbox" className="rounded text-primary focus:ring-primary" /> {u}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column: Uploads & Amenities */}
-                <div className="space-y-8">
-                  <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center text-center">
-                    <h3 className="font-bold text-gray-800 uppercase tracking-widest text-sm mb-4">Upload Photos</h3>
-                    <div className="flex gap-4 mb-4 text-gray-400">
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-6">Drag & drop photos or click to upload</p>
-                    
-                    <input type="file" multiple className="hidden" ref={propertyImageInputRef} onChange={handlePropertyImageChange} />
-                    <button 
-                      type="button"
-                      onClick={() => propertyImageInputRef.current.click()}
-                      className="bg-primary text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-primary/90 transition-all shadow-md"
-                    >
-                      Add Photos
-                    </button>
-                    
-                    {/* Preview Grid */}
-                    <div className="grid grid-cols-3 gap-2 mt-4 w-full">
-                       {propertyImages.map((src, i) => (
-                         <div key={i} className="aspect-square rounded-md overflow-hidden bg-gray-200 relative group">
-                            <img src={src} className="w-full h-full object-cover" alt="" />
-                            <button 
-                              type="button"
-                              onClick={() => setPropertyImages(prev => prev.filter((_, index) => index !== i))}
-                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                               <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                               </svg>
-                            </button>
-                         </div>
-                       ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-bold text-gray-800 text-sm uppercase mb-4">Property Amenities</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {['Pool', 'Gym', 'Parking', 'WiFi', 'Laundry', 'Balcony'].map(tag => (
-                        <span key={tag} className="px-3 py-1 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-600 hover:border-primary cursor-pointer transition-colors">
-                          {tag}
-                        </span>
-                      ))}
-                      <input type="text" placeholder="+ Add Tag" className="px-3 py-1 bg-transparent border-b border-gray-300 text-xs outline-none w-20" />
-                    </div>
-                  </div>
-
-                  <div className="pt-10 flex flex-col gap-3">
-                     <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg shadow-lg hover:bg-primary/90 transition-all active:scale-[0.98]">
-                       ADD PROPERTY
-                     </button>
-                     <button 
-                       type="button"
-                       onClick={() => setShowAddProperty(false)}
-                       className="w-full bg-gray-200 text-gray-600 font-bold py-3 rounded-lg hover:bg-gray-300 transition-all"
-                     >
-                       CANCEL
-                     </button>
-                  </div>
-                </div>
-              </form>
-            </div>
+            </main>
           </div>
         )}
-      </div>
+        
+        {active === "view-listings" && (
+          <div className="flex h-screen bg-gray-100 font-sans">
+            {/* View Listings takes full right side */}
+            <main className="flex-1 flex flex-col bg-white">
+              <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">View All Listings</h1>
+                  <p className="text-sm text-gray-600">Browse and manage your property listings</p>
+                </div>
+                <button 
+                  onClick={() => setActive('home')}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </header>
+              
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-green-900 mb-3">Published Listings</h3>
+                    <div className="space-y-3">
+                      <div className="bg-white rounded-lg p-4 border border-green-100">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-lg">Modern 2BHK Apartment</h4>
+                            <p className="text-gray-600">Thamel, Kathmandu • 800 sqft</p>
+                            <p className="text-2xl font-bold text-green-600">NPR 25,000/month</p>
+                            <div className="flex gap-2 mt-2">
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">2 Beds</span>
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">1 Bath</span>
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Furnished</span>
+                            </div>
+                          </div>
+                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Active</span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 border border-green-100">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-lg">Cozy Studio Room</h4>
+                            <p className="text-gray-600">Patan, Lalitpur • 400 sqft</p>
+                            <p className="text-2xl font-bold text-green-600">NPR 15,000/month</p>
+                            <div className="flex gap-2 mt-2">
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Studio</span>
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">1 Bath</span>
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Unfurnished</span>
+                            </div>
+                          </div>
+                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Active</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-3">Draft Listings</h3>
+                    <div className="bg-white rounded-lg p-4 border border-gray-100">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-lg">Luxury Villa</h4>
+                          <p className="text-gray-600">Baluwatar, Kathmandu • 2,500 sqft</p>
+                          <p className="text-2xl font-bold text-gray-600">NPR 80,000/month</p>
+                          <div className="flex gap-2 mt-2">
+                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">4 Beds</span>
+                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">3 Baths</span>
+                            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs">Fully Furnished</span>
+                          </div>
+                        </div>
+                        <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">Draft</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button className="w-full bg-primary text-white px-4 py-3 rounded-lg hover:bg-primary/90">
+                    + Add New Listing
+                  </button>
+                </div>
+              </div>
+            </main>
+          </div>
+        )}
+        
+        {active === "financial-reports" && (
+          <div className="flex h-screen bg-gray-100 font-sans">
+            {/* Financial Reports takes full right side */}
+            <main className="flex-1 flex flex-col bg-white">
+              <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Financial Reports</h1>
+                  <p className="text-sm text-gray-600">View detailed financial analytics and reports</p>
+                </div>
+                <button 
+                  onClick={() => setActive('home')}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </header>
+              
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-purple-900 mb-3">Monthly Summary</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-white rounded-lg p-3 border border-purple-100">
+                        <p className="text-sm text-gray-600">Total Income</p>
+                        <p className="text-2xl font-bold text-green-600">NPR 43,000</p>
+                        <p className="text-xs text-green-600">↑ 12% from last month</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 border border-purple-100">
+                        <p className="text-sm text-gray-600">Expenses</p>
+                        <p className="text-2xl font-bold text-red-600">NPR 8,500</p>
+                        <p className="text-xs text-red-600">↑ 5% from last month</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 border border-purple-100">
+                        <p className="text-sm text-gray-600">Net Profit</p>
+                        <p className="text-2xl font-bold text-blue-600">NPR 34,500</p>
+                        <p className="text-xs text-blue-600">↑ 15% from last month</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-900 mb-3">Payment Status</h3>
+                    <div className="space-y-3">
+                      <div className="bg-white rounded-lg p-3 border border-blue-100">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">Rajesh Kumar</p>
+                            <p className="text-sm text-gray-600">March Rent - Unit A-101</p>
+                            <p className="text-xs text-gray-500">Paid on: March 1, 2024</p>
+                          </div>
+                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">Paid</span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 border border-blue-100">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">Sita Sharma</p>
+                            <p className="text-sm text-gray-600">March Rent - Unit B-205</p>
+                            <p className="text-xs text-gray-500">Due: March 15, 2024</p>
+                          </div>
+                          <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">Pending</span>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 border border-blue-100">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">Prem Bahadur</p>
+                            <p className="text-sm text-gray-600">March Rent - Unit D-102</p>
+                            <p className="text-xs text-gray-500">15 days overdue</p>
+                          </div>
+                          <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">Overdue</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-green-900 mb-3">Occupancy Rate</h3>
+                    <div className="bg-white rounded-lg p-4 border border-green-100">
+                      <div className="flex justify-between items-center mb-3">
+                        <p className="text-lg font-medium">Current Occupancy</p>
+                        <p className="text-3xl font-bold text-green-600">85%</p>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
+                        <div className="bg-green-600 h-3 rounded-full" style={{width: '85%'}}></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Occupied Units</p>
+                          <p className="font-medium">17 out of 20</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Vacant Units</p>
+                          <p className="font-medium">3 units</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button className="flex-1 bg-primary text-white px-4 py-3 rounded-lg hover:bg-primary/90">
+                      Download Full Report
+                    </button>
+                    <button className="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300">
+                      Export to Excel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </main>
+          </div>
+        )}
+           </div>
     </section>
   );
 };
 
-export default Dashboard;
+// Add Property Form Component
+const AddPropertyForm = () => {
+  const [active, setActive] = useState('basic-info');
+  const [images, setImages] = useState([]);
+  const fileInputRef = useRef(null);
 
+  const [propertyForm, setPropertyForm] = useState({
+    name: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    listingType: 'For Rent',
+    propertyType: 'Apartment',
+    bedrooms: '',
+    bathrooms: '',
+    squareFootage: '',
+    monthlyRent: '',
+    securityDeposit: '',
+    salePrice: '',
+    description: '',
+    leaseTerms: '12 Months',
+    utilities: [],
+    amenities: [],
+    furnished: 'Unfurnished',
+    parking: 'None',
+    floorNumber: '',
+    totalFloors: '',
+    yearBuilt: '',
+    facingDirection: 'North',
+    nearbyPlaces: ''
+  });
+
+  const handlePropertyFormChange = (field, value) => {
+    setPropertyForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    const newImages = files.map(file => URL.createObjectURL(file));
+    setImages(prev => [...prev, ...newImages]);
+  };
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePropertySubmit = (e) => {
+    e.preventDefault();
+    // Store property in localStorage
+    const properties = JSON.parse(localStorage.getItem('properties') || '[]');
+    const newProperty = {
+      id: Date.now(),
+      ...propertyForm,
+      images: images,
+      createdAt: new Date().toISOString()
+    };
+    properties.push(newProperty);
+    localStorage.setItem('properties', JSON.stringify(properties));
+    
+    alert('Property added successfully!');
+    // Reset form
+    setPropertyForm({
+      name: '',
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      listingType: 'For Rent',
+      propertyType: 'Apartment',
+      bedrooms: '',
+      bathrooms: '',
+      squareFootage: '',
+      monthlyRent: '',
+      securityDeposit: '',
+      salePrice: '',
+      description: '',
+      leaseTerms: '12 Months',
+      utilities: [],
+      amenities: [],
+      furnished: 'Unfurnished',
+      parking: 'None',
+      floorNumber: '',
+      totalFloors: '',
+      yearBuilt: '',
+      facingDirection: 'North',
+      nearbyPlaces: ''
+    });
+    setImages([]);
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto p-6 bg-gray-50">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Header */}
+        <div className="p-8 border-b border-gray-100">
+          <h1 className="text-3xl font-bold text-gray-800 uppercase tracking-tight">Add New Property</h1>
+          <p className="text-gray-500 mt-1">Create a detailed listing for your rental unit.</p>
+        </div>
+
+        <form onSubmit={handlePropertySubmit} className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-10">
+          
+          {/* Left & Middle Column: Form Details */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Top Section: Name and Map Placeholder */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Property Name</label>
+                  <input 
+                    type="text" 
+                    value={propertyForm.name}
+                    onChange={(e) => handlePropertyFormChange('name', e.target.value)}
+                    placeholder="The Willow Apartments - Unit 3B" 
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-all" 
+                    required
+                  />
+                </div>
+                <div className="relative">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Address</label>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      value={propertyForm.address}
+                      onChange={(e) => handlePropertyFormChange('address', e.target.value)}
+                      placeholder="123 Main St, Springfield" 
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg pr-10 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                      required
+                    />
+                    <svg className="absolute right-3 top-2.5 text-gray-400" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <input 
+                    type="text" 
+                    value={propertyForm.city}
+                    onChange={(e) => handlePropertyFormChange('city', e.target.value)}
+                    placeholder="City" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                  />
+                  <input 
+                    type="text" 
+                    value={propertyForm.state}
+                    onChange={(e) => handlePropertyFormChange('state', e.target.value)}
+                    placeholder="State" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                  />
+                  <input 
+                    type="text" 
+                    value={propertyForm.zipCode}
+                    onChange={(e) => handlePropertyFormChange('zipCode', e.target.value)}
+                    placeholder="Zip Code" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                  />
+                </div>
+              </div>
+
+              {/* Map Placeholder */}
+              <div className="h-full min-h-[150px] bg-gray-100 rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+                <div className="bg-white p-2 border-b flex items-center gap-2">
+                   <svg width="14" height="14" className="text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                   </svg>
+                   <span className="text-xs text-gray-400">Search Map...</span>
+                </div>
+                <div className="flex-1 flex items-center justify-center text-gray-400 italic text-sm">
+                   <svg width="24" height="24" className="mb-1 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                   </svg>
+                   Google Maps Integration
+                </div>
+              </div>
+            </div>
+
+            {/* Middle Section: Specs */}
+            <div className="space-y-6">
+              <h3 className="font-bold text-gray-800 border-b pb-2">Property Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Property Type</label>
+                  <select 
+                    value={propertyForm.propertyType}
+                    onChange={(e) => handlePropertyFormChange('propertyType', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option>Apartment</option>
+                    <option>House</option>
+                    <option>Studio</option>
+                    <option>Room</option>
+                    <option>Villa</option>
+                    <option>Land</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Bedrooms</label>
+                  <input 
+                    type="number" 
+                    value={propertyForm.bedrooms}
+                    onChange={(e) => handlePropertyFormChange('bedrooms', e.target.value)}
+                    placeholder="2" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Bathrooms</label>
+                  <input 
+                    type="number" 
+                    value={propertyForm.bathrooms}
+                    onChange={(e) => handlePropertyFormChange('bathrooms', e.target.value)}
+                    placeholder="1.5" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Square Footage</label>
+                  <input 
+                    type="number" 
+                    value={propertyForm.squareFootage}
+                    onChange={(e) => handlePropertyFormChange('squareFootage', e.target.value)}
+                    placeholder="1100" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Monthly Rent (NPR)</label>
+                  <input 
+                    type="number" 
+                    value={propertyForm.monthlyRent}
+                    onChange={(e) => handlePropertyFormChange('monthlyRent', e.target.value)}
+                    placeholder="1850" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Security Deposit (NPR)</label>
+                  <input 
+                    type="number" 
+                    value={propertyForm.securityDeposit}
+                    onChange={(e) => handlePropertyFormChange('securityDeposit', e.target.value)}
+                    placeholder="2000" 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Description</label>
+                  <textarea 
+                    rows="4" 
+                    value={propertyForm.description}
+                    onChange={(e) => handlePropertyFormChange('description', e.target.value)}
+                    placeholder="Enter your description here..." 
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" 
+                  />
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Lease Terms</label>
+                    <div className="flex gap-2">
+                       <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-100 cursor-pointer">
+                         {propertyForm.leaseTerms}
+                       </span>
+                       <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold cursor-pointer hover:bg-gray-200">
+                         Pet Friendly
+                       </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Utilities Included</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Water', 'Trash', 'Gas', 'Electric'].map(utility => (
+                        <label key={utility} className="flex items-center gap-2 text-sm text-gray-600">
+                          <input 
+                            type="checkbox" 
+                            checked={propertyForm.utilities.includes(utility)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                handlePropertyFormChange('utilities', [...propertyForm.utilities, utility]);
+                              } else {
+                                handlePropertyFormChange('utilities', propertyForm.utilities.filter(u => u !== utility));
+                              }
+                            }}
+                            className="rounded text-emerald-600 focus:ring-emerald-500" 
+                          /> {utility}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Uploads & Amenities */}
+          <div className="space-y-8">
+            <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center text-center">
+              <h3 className="font-bold text-gray-800 uppercase tracking-widest text-sm mb-4">Upload Photos</h3>
+              <div className="flex gap-4 mb-4 text-gray-400">
+                <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <p className="text-xs text-gray-500 mb-6">Drag & drop photos or click to upload</p>
+              
+              <input 
+                type="file" 
+                multiple 
+                className="hidden" 
+                ref={fileInputRef} 
+                onChange={handleImageChange} 
+              />
+              <button 
+                type="button"
+                onClick={() => fileInputRef.current.click()}
+                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all shadow-md"
+              >
+                Add Photos
+              </button>
+              
+              {/* Preview Grid */}
+              <div className="grid grid-cols-3 gap-2 mt-4 w-full">
+                 {images.map((src, i) => (
+                   <div key={i} className="aspect-square rounded-md overflow-hidden bg-gray-200 relative group">
+                      <img src={src} className="w-full h-full object-cover" alt="" />
+                      <button 
+                        type="button"
+                        onClick={() => removeImage(i)}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                         <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                         </svg>
+                      </button>
+                   </div>
+                 ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-gray-800 text-sm uppercase mb-4">Property Amenities</h3>
+              <div className="flex flex-wrap gap-2">
+                {['Pool', 'Gym', 'Parking', 'WiFi', 'Laundry', 'Balcony'].map(amenity => (
+                  <span 
+                    key={amenity}
+                    className={`px-3 py-1 border rounded-md text-xs font-medium cursor-pointer transition-colors ${
+                      propertyForm.amenities.includes(amenity)
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-500'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-emerald-500'
+                    }`}
+                    onClick={() => {
+                      if (propertyForm.amenities.includes(amenity)) {
+                        handlePropertyFormChange('amenities', propertyForm.amenities.filter(a => a !== amenity));
+                      } else {
+                        handlePropertyFormChange('amenities', [...propertyForm.amenities, amenity]);
+                      }
+                    }}
+                  >
+                    {amenity}
+                  </span>
+                ))}
+                <input 
+                  type="text" 
+                  placeholder="+ Add Tag" 
+                  className="px-3 py-1 bg-transparent border-b border-gray-300 text-xs outline-none w-20" 
+                />
+              </div>
+            </div>
+
+            <div className="pt-10 flex flex-col gap-3">
+               <button 
+                 type="submit"
+                 className="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-emerald-700 transition-all active:scale-[0.98]"
+               >
+                 ADD PROPERTY
+               </button>
+               <button 
+                 type="button"
+                 onClick={() => setActive('home')}
+                 className="w-full bg-gray-200 text-gray-600 font-bold py-3 rounded-lg hover:bg-gray-300 transition-all"
+               >
+                 CANCEL
+               </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Placeholder components for other quick actions
+const ManageTenantsForm = () => (
+  <div className="flex h-screen bg-gray-100 font-sans">
+    <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="p-4 border-b border-gray-100">
+        <h2 className="text-xl font-bold text-gray-800">Manage Tenants</h2>
+        <p className="text-sm text-gray-600 mt-1">Handle tenant information</p>
+      </div>
+    </aside>
+    <main className="flex-1 flex flex-col bg-white">
+      <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Manage Tenants</h1>
+          <p className="text-sm text-gray-600">Handle tenant information</p>
+        </div>
+        <button className="text-gray-500 hover:text-gray-700">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </header>
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="bg-white rounded-xl p-6 border border-gray-200">
+          <p className="text-gray-600">Tenant management form will be displayed here.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+);
+
+const ViewListingsForm = () => (
+  <div className="flex h-screen bg-gray-100 font-sans">
+    <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="p-4 border-b border-gray-100">
+        <h2 className="text-xl font-bold text-gray-800">View Listings</h2>
+        <p className="text-sm text-gray-600 mt-1">Browse all property listings</p>
+      </div>
+    </aside>
+    <main className="flex-1 flex flex-col bg-white">
+      <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">View All Listings</h1>
+          <p className="text-sm text-gray-600">Browse all property listings</p>
+        </div>
+        <button className="text-gray-500 hover:text-gray-700">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </header>
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="bg-white rounded-xl p-6 border border-gray-200">
+          <p className="text-gray-600">Property listings will be displayed here.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+);
+
+const FinancialReportsForm = () => (
+  <div className="flex h-screen bg-gray-100 font-sans">
+    <aside className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div className="p-4 border-b border-gray-100">
+        <h2 className="text-xl font-bold text-gray-800">Financial Reports</h2>
+        <p className="text-sm text-gray-600 mt-1">View financial analytics</p>
+      </div>
+    </aside>
+    <main className="flex-1 flex flex-col bg-white">
+      <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Financial Reports</h1>
+          <p className="text-sm text-gray-600">View financial analytics</p>
+        </div>
+        <button className="text-gray-500 hover:text-gray-700">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </header>
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="bg-white rounded-xl p-6 border border-gray-200">
+          <p className="text-gray-600">Financial reports will be displayed here.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+);
+
+export default Dashboard;

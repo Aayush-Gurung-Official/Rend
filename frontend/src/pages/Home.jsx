@@ -18,6 +18,7 @@ const Home = () => {
     maxPrice: "",
   });
   const [listings, setListings] = useState([]);
+  const [featuredListings, setFeaturedListings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
@@ -30,8 +31,43 @@ const Home = () => {
   const fetchListings = async () => {
     try {
       setLoading(true);
-      const data = await fetchListingsApi(filters);
-      setListings(data);
+      // Get properties from localStorage
+      const storedProperties = JSON.parse(localStorage.getItem('properties') || '[]');
+      
+      // Apply filters
+      let filteredProperties = storedProperties;
+      if (filters.mode === 'rent') {
+        filteredProperties = filteredProperties.filter(p => p.listingType === 'For Rent' || p.listingType === 'For Both');
+      } else if (filters.mode === 'buy') {
+        filteredProperties = filteredProperties.filter(p => p.listingType === 'For Sale' || p.listingType === 'For Both');
+      }
+      
+      if (filters.city) {
+        filteredProperties = filteredProperties.filter(p => p.city.toLowerCase().includes(filters.city.toLowerCase()));
+      }
+      
+      if (filters.minPrice) {
+        filteredProperties = filteredProperties.filter(p => {
+          const price = filters.mode === 'rent' ? p.monthlyRent : p.salePrice;
+          return price && parseInt(price) >= parseInt(filters.minPrice);
+        });
+      }
+      
+      if (filters.maxPrice) {
+        filteredProperties = filteredProperties.filter(p => {
+          const price = filters.mode === 'rent' ? p.monthlyRent : p.salePrice;
+          return price && parseInt(price) <= parseInt(filters.maxPrice);
+        });
+      }
+      
+      setListings(filteredProperties);
+      
+      // Set featured listings (latest 6 properties)
+      const latestProperties = storedProperties
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 6);
+      setFeaturedListings(latestProperties);
+      
     } catch (e) {
       console.error(e);
     } finally {
@@ -43,6 +79,25 @@ const Home = () => {
     fetchListings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Listen for storage changes to update featured listings
+  useEffect(() => {
+    const handleStorageChange = () => {
+      fetchListings();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check for changes every 5 seconds
+    const interval = setInterval(() => {
+      fetchListings();
+    }, 5000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [filters]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -90,7 +145,7 @@ const Home = () => {
             See all
           </button>
         </div>
-        <ListingsGrid listings={listings} loading={loading} />
+        <ListingsGrid listings={featuredListings} loading={loading} />
       </section>
 
       <ServicesSection />

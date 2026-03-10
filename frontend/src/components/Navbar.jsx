@@ -30,7 +30,7 @@ const Navbar = () => {
           <img
             src={Logo}
             alt="Rend logo"
-            className="-ml-2 h-9 w-auto object-contain md:h-10"
+            className="h-9 w-auto object-contain md:h-10"
           />
           <div className="hidden leading-tight sm:block">
             <div className="text-base font-semibold text-slate-900 md:text-lg">Rend</div>
@@ -58,13 +58,27 @@ const Navbar = () => {
               List Property
             </NavLink>
             <button
-              onClick={() => handleSectionClick("services")}
+              onClick={() => {
+                if (location.pathname !== '/') {
+                  navigate('/');
+                  setTimeout(() => scrollToSection('services-section'), 100);
+                } else {
+                  scrollToSection('services-section');
+                }
+              }}
               className="transition hover:text-primary"
             >
               Services
             </button>
             <button
-              onClick={() => handleSectionClick("help")}
+              onClick={() => {
+                if (location.pathname !== '/') {
+                  navigate('/');
+                  setTimeout(() => scrollToSection('help-section'), 100);
+                } else {
+                  scrollToSection('help-section');
+                }
+              }}
               className="transition hover:text-primary"
             >
               Help
