@@ -7,6 +7,10 @@ const morgan = require("morgan");
 
 const listingsRouter = require("./routes/listings");
 const authRouter = require("./routes/auth");
+const propertyRouter = require("./routes/propertyRoutes");
+const tenantRouter = require("./routes/tenantRoutes");
+const paymentRouter = require("./routes/paymentRoutes");
+const maintenanceRouter = require("./routes/maintenanceRoutes");
 const connectDB = require("./config/db");
 
 const app = express();
@@ -27,6 +31,10 @@ app.get("/", (req, res) => {
 
 app.use("/api/listings", listingsRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/properties", propertyRouter);
+app.use("/api/tenants", tenantRouter);
+app.use("/api/payments", paymentRouter);
+app.use("/api/maintenance", maintenanceRouter);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
