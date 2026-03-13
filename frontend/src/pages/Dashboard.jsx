@@ -19,6 +19,19 @@ const Dashboard = () => {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [propertyImages, setPropertyImages] = useState([]);
   const [listings, setListings] = useState([]);
+  
+  // Property search state
+  const [listingType, setListingType] = useState('For Rent');
+  const [searchFilters, setSearchFilters] = useState({
+    location: '',
+    propertyType: 'All Types',
+    priceRange: 'Any Price',
+    bedrooms: 'Any'
+  });
+  const [properties, setProperties] = useState([]);
+  const [featuredProperties, setFeaturedProperties] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [tenants, setTenants] = useState([
     {
       id: 1,
@@ -154,6 +167,88 @@ const Dashboard = () => {
     setChatHistory([...chatHistory, newMessage]);
     setMessage('');
   };
+
+  // Property search API functions
+  const fetchFeaturedProperties = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/properties/featured');
+      const data = await response.json();
+      // Ensure data is an array
+      setFeaturedProperties(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError('Failed to fetch featured properties');
+      console.error('Error fetching featured properties:', err);
+      setFeaturedProperties([]); // Set to empty array on error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProperties = async (filters = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const queryParams = new URLSearchParams();
+      
+      // Add listing type filter
+      if (listingType) {
+        queryParams.append('listingType', listingType);
+      }
+      
+      // Add other filters
+      if (filters.location) queryParams.append('location', filters.location);
+      if (filters.propertyType && filters.propertyType !== 'All Types') {
+        queryParams.append('propertyType', filters.propertyType);
+      }
+      if (filters.priceRange && filters.priceRange !== 'Any Price') {
+        queryParams.append('priceRange', filters.priceRange);
+      }
+      if (filters.bedrooms && filters.bedrooms !== 'Any') {
+        queryParams.append('bedrooms', filters.bedrooms);
+      }
+      
+      const response = await fetch(`http://localhost:5000/api/properties?${queryParams}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Ensure properties is an array
+        setProperties(Array.isArray(data.properties) ? data.properties : []);
+      } else {
+        setError(data.message || 'Failed to fetch properties');
+        setProperties([]); // Set to empty array on error
+      }
+    } catch (err) {
+      setError('Failed to fetch properties');
+      console.error('Error fetching properties:', err);
+      setProperties([]); // Set to empty array on error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchProperties = () => {
+    fetchProperties(searchFilters);
+  };
+
+  const handleClearFilters = () => {
+    setSearchFilters({
+      location: '',
+      propertyType: 'All Types',
+      priceRange: 'Any Price',
+      bedrooms: 'Any'
+    });
+    fetchProperties({});
+  };
+
+  // Load featured properties when component mounts
+  useEffect(() => {
+    if (active === "view-listings" && userType === "user") {
+      fetchFeaturedProperties();
+      fetchProperties({});
+    }
+  }, [active, userType, listingType]);
 
   const handlePropertyImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -304,7 +399,7 @@ const Dashboard = () => {
             ))
           :
             // User navigation - only tenant-relevant items
-            ["home", "pay-rent", "maintenance", "lease", "contact", "chat", "profile", "settings"].map((key) => (
+            ["home", "view-listings", "pay-rent", "maintenance", "lease", "contact", "chat", "profile", "settings"].map((key) => (
               <button
                 key={key}
                 onClick={() => {
@@ -319,6 +414,7 @@ const Dashboard = () => {
               >
                 <span>
                   {key === "home" ? "Dashboard home" : 
+                   key === "view-listings" ? "Browse Properties" :
                    key === "pay-rent" ? "Pay Rent" :
                    key === "maintenance" ? "Request Maintenance" :
                    key === "lease" ? "Lease Agreement" :
@@ -833,6 +929,316 @@ const Dashboard = () => {
                     </div>
                   </form>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {active === "view-listings" && userType === "user" && (
+          <div className="min-h-screen bg-gray-50">
+            {/* Header */}
+            <div className="bg-white shadow-sm border-b border-gray-200">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Browse Properties</h1>
+                    <p className="text-sm text-gray-600">Find your perfect rental property</p>
+                  </div>
+                  <button 
+                    onClick={() => setActive('home')}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {/* Search Section */}
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-8">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Search Properties</h2>
+                
+                {/* Rent/Buy Toggle */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-center">
+                    <div className="bg-gray-100 rounded-lg p-1 flex">
+                      <button 
+                        className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                          listingType === 'For Rent' 
+                            ? 'bg-primary text-white' 
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                        onClick={() => setListingType('For Rent')}
+                      >
+                        For Rent
+                      </button>
+                      <button 
+                        className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                          listingType === 'For Buy' 
+                            ? 'bg-primary text-white' 
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                        onClick={() => setListingType('For Buy')}
+                      >
+                        For Buy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                    <input 
+                      type="text" 
+                      placeholder="Enter city or area"
+                      value={searchFilters.location}
+                      onChange={(e) => setSearchFilters({...searchFilters, location: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Property Type</label>
+                    <select 
+                      value={searchFilters.propertyType}
+                      onChange={(e) => setSearchFilters({...searchFilters, propertyType: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    >
+                      <option>All Types</option>
+                      <option>Apartment</option>
+                      <option>House</option>
+                      <option>Studio</option>
+                      <option>Room</option>
+                      <option>Villa</option>
+                      <option>Land</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                    <select 
+                      value={searchFilters.priceRange}
+                      onChange={(e) => setSearchFilters({...searchFilters, priceRange: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    >
+                      <option>Any Price</option>
+                      <option>Under 15,000</option>
+                      <option>15,000 - 25,000</option>
+                      <option>25,000 - 40,000</option>
+                      <option>40,000 - 60,000</option>
+                      <option>Above 60,000</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Bedrooms</label>
+                    <select 
+                      value={searchFilters.bedrooms}
+                      onChange={(e) => setSearchFilters({...searchFilters, bedrooms: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                    >
+                      <option>Any</option>
+                      <option>Studio</option>
+                      <option>1 Bed</option>
+                      <option>2 Beds</option>
+                      <option>3 Beds</option>
+                      <option>4+ Beds</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-4 mt-6">
+                  <button 
+                    onClick={handleSearchProperties}
+                    className="flex-1 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 font-semibold transition-colors"
+                  >
+                    Search Properties
+                  </button>
+                  <button 
+                    onClick={handleClearFilters}
+                    className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+
+              {/* Featured Properties */}
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                  <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                  Featured Properties
+                </h2>
+                {loading ? (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-8">
+                    <p className="text-red-600">{error}</p>
+                    <button onClick={fetchFeaturedProperties} className="mt-4 text-primary hover:underline">
+                      Try Again
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {(Array.isArray(featuredProperties) ? featuredProperties.filter(property => 
+                      listingType === 'For Rent' ? 
+                        property.listingType === 'For Rent' || property.listingType === 'For Both' :
+                        property.listingType === 'For Sale' || property.listingType === 'For Both'
+                    ) : []).map((property) => (
+                      <div key={property._id} className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow">
+                        <div className="relative">
+                          <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                            {property.images && property.images.length > 0 ? (
+                              <img src={property.images[0]} alt={property.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="absolute top-4 left-4 flex gap-2">
+                            <span className="bg-yellow-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                              FEATURED
+                            </span>
+                            {property.listingType === 'For Sale' || property.listingType === 'For Both' ? (
+                              <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                                FOR SALE
+                              </span>
+                            ) : (
+                              <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                                FOR RENT
+                              </span>
+                            )}
+                          </div>
+                          <div className="absolute top-4 right-4">
+                            <button className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors">
+                              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          <h3 className="text-xl font-bold text-gray-900 mb-2">{property.name}</h3>
+                          <p className="text-gray-600 mb-4 flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            {property.city}, {property.state}
+                          </p>
+                          <div className="flex items-center justify-between mb-4">
+                            <p className="text-2xl font-bold text-primary">
+                              {property.listingType === 'For Sale' || property.listingType === 'For Both' ? 
+                                `NPR ${property.salePrice?.toLocaleString()}` : 
+                                `NPR ${property.monthlyRent?.toLocaleString()}/mo`
+                              }
+                            </p>
+                            <span className="text-sm text-gray-500">{property.squareFootage} sqft</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {property.bedrooms && <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">{property.bedrooms} Beds</span>}
+                            {property.bathrooms && <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">{property.bathrooms} Baths</span>}
+                            <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">{property.furnished}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button className="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 font-medium transition-colors">
+                              View Details
+                            </button>
+                            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors">
+                              Contact
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Search Results */}
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-6">Available Properties</h2>
+                {loading ? (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-8">
+                    <p className="text-red-600">{error}</p>
+                    <button onClick={() => fetchProperties(searchFilters)} className="mt-4 text-primary hover:underline">
+                      Try Again
+                    </button>
+                  </div>
+                ) : (!Array.isArray(properties) || properties.length === 0) ? (
+                  <div className="text-center py-8">
+                    <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <p className="text-gray-600">No properties found matching your criteria</p>
+                    <button onClick={handleClearFilters} className="mt-4 text-primary hover:underline">
+                      Clear Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {(Array.isArray(properties) ? properties : []).map((property) => (
+                      <div key={property._id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+                        <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                          {property.images && property.images.length > 0 ? (
+                            <img src={property.images[0]} alt={property.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="p-6">
+                          <h3 className="text-lg font-bold text-gray-900 mb-2">{property.name}</h3>
+                          <p className="text-gray-600 mb-3 flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            {property.city}, {property.state}
+                          </p>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-xl font-bold text-primary">
+                              {property.listingType === 'For Sale' || property.listingType === 'For Both' ? 
+                                `NPR ${property.salePrice?.toLocaleString()}` : 
+                                `NPR ${property.monthlyRent?.toLocaleString()}/mo`
+                              }
+                            </p>
+                            <span className="text-sm text-gray-500">{property.squareFootage} sqft</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {property.bedrooms && <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs">{property.bedrooms} Beds</span>}
+                            {property.bathrooms && <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs">{property.bathrooms} Baths</span>}
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              property.listingType === 'For Sale' || property.listingType === 'For Both' 
+                                ? 'bg-red-100 text-red-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {property.listingType === 'For Sale' || property.listingType === 'For Both' ? 'FOR SALE' : 'FOR RENT'}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button className="flex-1 bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 font-medium transition-colors text-sm">
+                              View Details
+                            </button>
+                            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors text-sm">
+                              Contact
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
