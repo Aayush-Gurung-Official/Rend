@@ -11,6 +11,7 @@ const propertyRouter = require("./routes/propertyRoutes");
 const tenantRouter = require("./routes/tenantRoutes");
 const paymentRouter = require("./routes/paymentRoutes");
 const maintenanceRouter = require("./routes/maintenanceRoutes");
+const agreementRouter = require("./routes/agreementRoutes");
 const connectDB = require("./config/db");
 
 const app = express();
@@ -35,6 +36,7 @@ app.use("/api/properties", propertyRouter);
 app.use("/api/tenants", tenantRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/maintenance", maintenanceRouter);
+app.use("/api/agreements", agreementRouter);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
