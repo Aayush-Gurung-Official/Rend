@@ -25,20 +25,40 @@ const Navbar = () => {
 
   return (
     <header className="w-full border-b border-slate-200 bg-white/80 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-8 md:py-4">
-        <Link to="/" className="flex items-center gap-3">
-          <img
-            src={Logo}
-            alt="Rend logo"
-            className="h-9 w-auto object-contain md:h-10"
-          />
-          <div className="hidden leading-tight sm:block">
-            <div className="text-base font-semibold text-slate-900 md:text-lg">Rend</div>
-            <div className="text-[11px] text-slate-500 md:text-xs">
-              Homes in Nepal
+      <div
+        className={`flex w-full items-center justify-between py-3 md:py-4 ${
+          location.pathname === "/dashboard"
+            ? "pl-0 pr-4 md:pr-8"
+            : "mx-auto max-w-7xl px-4 md:px-8"
+        }`}
+      >
+        {location.pathname === "/dashboard" ? (
+          <div className="flex items-center gap-3">
+            <img
+              src={Logo}
+              alt="Rend logo"
+              className="h-9 w-auto object-contain md:h-10"
+            />
+            <div className="hidden leading-tight sm:block">
+              <div className="text-base font-semibold text-slate-900 md:text-lg">Rend</div>
+              <div className="text-[11px] text-slate-500 md:text-xs">Homes in Nepal</div>
             </div>
           </div>
-        </Link>
+        ) : (
+          <Link to="/" className="flex items-center gap-3">
+            <img
+              src={Logo}
+              alt="Rend logo"
+              className="h-9 w-auto object-contain md:h-10"
+            />
+            <div className="hidden leading-tight sm:block">
+              <div className="text-base font-semibold text-slate-900 md:text-lg">Rend</div>
+              <div className="text-[11px] text-slate-500 md:text-xs">
+                Homes in Nepal
+              </div>
+            </div>
+          </Link>
+        )}
         {location.pathname !== '/dashboard' && (
           <nav className="hidden items-center gap-5 text-sm font-medium text-slate-600 md:flex">
             <NavLink
