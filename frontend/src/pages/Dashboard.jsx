@@ -32,6 +32,38 @@ const Dashboard = () => {
   const [featuredProperties, setFeaturedProperties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Agreement management state
+  const [agreements, setAgreements] = useState([]);
+  const [agreementType, setAgreementType] = useState('lease'); // lease, purchase, maintenance, etc.
+  const [selectedAgreement, setSelectedAgreement] = useState(null);
+  const [agreementForm, setAgreementForm] = useState({
+    title: '',
+    type: 'lease', // lease, purchase, maintenance, termination
+    propertyId: '',
+    parties: {
+      landlord: '',
+      tenant: '',
+      witnesses: []
+    },
+    terms: {
+      duration: '',
+      rentAmount: '',
+      securityDeposit: '',
+      purchasePrice: '',
+      paymentSchedule: '',
+      maintenanceResponsibilities: '',
+      utilities: [],
+      restrictions: []
+    },
+    dates: {
+      startDate: '',
+      endDate: '',
+      signingDate: ''
+    },
+    status: 'draft', // draft, active, expired, terminated
+    documents: []
+  });
   const [tenants, setTenants] = useState([
     {
       id: 1,
@@ -250,6 +282,1443 @@ const Dashboard = () => {
     }
   }, [active, userType, listingType]);
 
+  // Agreement API functions
+  const fetchUserAgreements = async () => {
+    try {
+      setLoading(true);
+      const userId = user?.id || 'demo-user-id'; // Fallback for demo
+      const response = await fetch(`http://localhost:5000/api/agreements/user/${userId}`);
+      const data = await response.json();
+      setAgreements(Array.isArray(data.agreements) ? data.agreements : []);
+    } catch (err) {
+      console.error('Error fetching agreements:', err);
+      setAgreements([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadAgreement = async (agreementId, agreementTitle) => {
+    try {
+      // Create a proper PDF content for download
+      const agreement = agreements.find(a => a._id === agreementId) || window.currentViewingAgreement;
+      if (!agreement) {
+        alert('Agreement not found');
+        return;
+      }
+      
+      // Generate PDF content
+      const pdfContent = generatePDFContent(agreement);
+      
+      // Create blob and download
+      const blob = new Blob([pdfContent], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${agreement.title}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      console.log('Downloaded agreement:', agreement.title);
+    } catch (err) {
+      console.error('Error downloading agreement:', err);
+      alert('Failed to download agreement');
+    }
+  };
+
+  const generatePDFContent = (agreement) => {
+    // Generate a simple PDF-like content (in production, use a proper PDF library)
+    let content = `%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
+
+2 0 obj
+<<
+/Type /Pages
+/Kids [3 0 R]
+/Count 1
+>>
+endobj
+
+3 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents 4 0 R
+/Resources <<
+/Font <<
+/F1 5 0 R
+>>
+>>
+>>
+endobj
+
+4 0 obj
+<<
+/Length ${1000}
+>>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(${agreement.title}) Tj
+0 -14 Td
+(Status: ${agreement.status}) Tj
+0 -14 Td
+(Created: ${new Date(agreement.createdAt).toLocaleDateString()}) Tj
+0 -28 Td
+(Property: ${agreement.property?.name || 'Not specified'}) Tj
+0 -14 Td
+(Address: ${agreement.property?.address || 'Not specified'}) Tj
+0 -28 Td
+(Parties:) Tj
+0 -14 Td
+${agreement.type === 'lease' ? `(Landlord: ${agreement.parties?.landlord?.fullName || 'Not specified'}) Tj
+0 -14 Td
+(Tenant: ${agreement.parties?.tenant?.fullName || 'Not specified'}) Tj` : ''}
+${agreement.type === 'purchase' ? `(Buyer: ${agreement.parties?.buyer?.fullName || 'Not specified'}) Tj
+0 -14 Td
+(Seller: ${agreement.parties?.seller?.fullName || 'Not specified'}) Tj` : ''}
+${agreement.type === 'maintenance' ? `(Service Provider: ${agreement.parties?.service_provider?.fullName || 'Not specified'}) Tj` : ''}
+0 -28 Td
+(Terms & Conditions:) Tj
+0 -14 Td
+${agreement.type === 'lease' ? `(Monthly Rent: NPR ${agreement.terms?.rentAmount?.toLocaleString() || 'N/A'}) Tj
+0 -14 Td
+(Security Deposit: NPR ${agreement.terms?.securityDeposit?.toLocaleString() || 'N/A'}) Tj
+0 -14 Td
+(Duration: ${agreement.terms?.duration || 'N/A'}) Tj
+0 -14 Td
+(Start Date: ${agreement.dates?.startDate ? new Date(agreement.dates.startDate).toLocaleDateString() : 'N/A'}) Tj` : ''}
+${agreement.type === 'purchase' ? `(Purchase Price: NPR ${agreement.terms?.purchasePrice?.toLocaleString() || 'N/A'}) Tj
+0 -14 Td
+(Payment Method: ${agreement.terms?.paymentMethod || 'N/A'}) Tj
+0 -14 Td
+(Signing Date: ${agreement.dates?.signingDate ? new Date(agreement.dates.signingDate).toLocaleDateString() : 'N/A'}) Tj` : ''}
+${agreement.terms?.specialTerms ? `0 -14 Td
+(Special Terms: ${agreement.terms.specialTerms}) Tj` : ''}
+0 -42 Td
+(Legal Terms:) Tj
+0 -14 Td
+(This agreement is legally binding and constitutes the entire understanding) Tj
+0 -14 Td
+(between the parties involved. All obligations and responsibilities) Tj
+0 -14 Td
+(outlined in this agreement must be fulfilled according to the) Tj
+0 -14 Td
+(specified terms and conditions. Any violations may result in) Tj
+0 -14 Td
+(legal consequences as applicable under Nepalese law.) Tj
+ET
+endstream
+endobj
+
+5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Helvetica
+>>
+endobj
+
+xref
+0 6
+0000000000 65535 f 
+0000000010 00000 n 
+0000000079 00000 n 
+0000000173 00000 n 
+0000000300 00000 n 
+0000000500 00000 n 
+trailer
+<<
+/Size 6
+/Root 1 0 R
+>>
+startxref
+600
+%%EOF`;
+    
+    return content;
+  };
+
+  const printAgreement = (agreementId, agreementTitle) => {
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${agreementTitle}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+            h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+            .agreement-content { margin: 20px 0; }
+            .terms-section { margin: 15px 0; }
+            .signature-section { margin-top: 50px; border-top: 1px solid #ccc; padding-top: 20px; }
+            @media print { body { margin: 0; font-size: 12px; } }
+          </style>
+        </head>
+        <body>
+          <h1>${agreementTitle}</h1>
+          <div class="agreement-content">
+            <p><strong>Agreement ID:</strong> ${agreementId}</p>
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            <p><strong>Status:</strong> Active</p>
+            
+            <div class="terms-section">
+              <h3>Terms and Conditions</h3>
+              <p>This agreement is legally binding and constitutes the entire understanding between the parties.</p>
+              <p>All obligations and responsibilities outlined in this agreement must be fulfilled according to the specified terms.</p>
+              <p>Any violations of this agreement may result in legal consequences as applicable under Nepalese law.</p>
+            </div>
+            
+            <div class="signature-section">
+              <p><strong>Authorized Signature:</strong> _________________________</p>
+              <p><strong>Date:</strong> _________________________</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+    printWindow.close();
+  };
+
+  const viewFullAgreement = (agreement) => {
+    // Create a detailed view modal for the agreement
+    const modalHtml = `
+      <div style="padding: 32px; max-width: 800px; margin: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h2 style="margin: 0 0 8px 0; color: #1f2937; font-size: 28px; font-weight: 700;">${agreement.title}</h2>
+          <div style="display: flex; justify-content: center; gap: 16px; margin-top: 12px;">
+            <span style="
+              background: ${agreement.status === 'active' ? '#10b981' : agreement.status === 'pending' ? '#f59e0b' : '#6b7280'};
+              color: white;
+              padding: 6px 12px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: 500;
+            ">${agreement.status.toUpperCase()}</span>
+            <span style="color: #6b7280; font-size: 14px;">Created: ${new Date(agreement.createdAt).toLocaleDateString()}</span>
+          </div>
+        </div>
+        
+        <div style="background: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">Property Details</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Property Name</p>
+              <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.property?.name || 'Not specified'}</p>
+            </div>
+            <div>
+              <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Address</p>
+              <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.property?.address || 'Not specified'}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="background: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">Parties Involved</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            ${agreement.type === 'lease' ? `
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Landlord</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.parties?.landlord?.fullName || 'Not specified'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Tenant</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.parties?.tenant?.fullName || 'Not specified'}</p>
+              </div>
+            ` : ''}
+            ${agreement.type === 'purchase' ? `
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Buyer</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.parties?.buyer?.fullName || 'Not specified'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Seller</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.parties?.seller?.fullName || 'Not specified'}</p>
+              </div>
+            ` : ''}
+            ${agreement.type === 'maintenance' ? `
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Service Provider</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.parties?.service_provider?.fullName || 'Not specified'}</p>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+        
+        <div style="background: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">Terms & Conditions</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            ${agreement.type === 'lease' ? `
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Monthly Rent</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">NPR ${agreement.terms?.rentAmount?.toLocaleString() || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Security Deposit</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">NPR ${agreement.terms?.securityDeposit?.toLocaleString() || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Duration</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.terms?.duration || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Start Date</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.dates?.startDate ? new Date(agreement.dates.startDate).toLocaleDateString() : 'N/A'}</p>
+              </div>
+            ` : ''}
+            ${agreement.type === 'purchase' ? `
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Purchase Price</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">NPR ${agreement.terms?.purchasePrice?.toLocaleString() || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Payment Method</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.terms?.paymentMethod || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Signing Date</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.dates?.signingDate ? new Date(agreement.dates.signingDate).toLocaleDateString() : 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Completion Date</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.dates?.endDate ? new Date(agreement.dates.endDate).toLocaleDateString() : 'N/A'}</p>
+              </div>
+            ` : ''}
+            ${agreement.type === 'maintenance' ? `
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Service Type</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.terms?.serviceDetails?.serviceType || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Monthly Cost</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">NPR ${agreement.terms?.serviceDetails?.cost?.toLocaleString() || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Frequency</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.terms?.serviceDetails?.frequency || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Next Service</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.terms?.serviceDetails?.nextServiceDate ? new Date(agreement.terms.serviceDetails.nextServiceDate).toLocaleDateString() : 'N/A'}</p>
+              </div>
+            ` : ''}
+            ${agreement.type === 'termination' ? `
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Reason</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.terms?.terminationReason || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Notice Period</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.terms?.noticePeriod || 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Notice Date</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.dates?.noticeDate ? new Date(agreement.dates.noticeDate).toLocaleDateString() : 'N/A'}</p>
+              </div>
+              <div>
+                <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 14px;">Effective Date</p>
+                <p style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 500;">${agreement.dates?.effectiveDate ? new Date(agreement.dates.effectiveDate).toLocaleDateString() : 'N/A'}</p>
+              </div>
+            ` : ''}
+          </div>
+          ${agreement.terms?.specialTerms ? `
+            <div style="margin-top: 16px;">
+              <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">Special Terms</p>
+              <p style="margin: 0; color: #1f2937; font-size: 16px; line-height: 1.5;">${agreement.terms.specialTerms}</p>
+            </div>
+          ` : ''}
+        </div>
+        
+        <div style="background: #f9fafb; border-radius: 12px; padding: 24px;">
+          <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">Legal Terms & Conditions</h3>
+          <div style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+            <p style="margin: 0 0 12px 0;">This agreement is legally binding and constitutes the entire understanding between the parties involved.</p>
+            <p style="margin: 0 0 12px 0;">All obligations and responsibilities outlined in this agreement must be fulfilled according to the specified terms and conditions.</p>
+            <p style="margin: 0 0 12px 0;">Any violations of this agreement may result in legal consequences as applicable under Nepalese law.</p>
+            <p style="margin: 0;">This agreement is effective from the signing date and remains valid until terminated according to the terms specified herein.</p>
+          </div>
+        </div>
+        
+        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 32px;">
+          <button onclick="window.parent.downloadCurrentAgreement()" style="
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          ">Download PDF</button>
+          <button onclick="window.parent.printCurrentAgreement()" style="
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          ">Print Agreement</button>
+          <button onclick="window.parent.closeAgreementForm()" style="
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+          ">Close</button>
+        </div>
+      </div>
+    `;
+    
+    // Store current agreement for download/print
+    window.currentViewingAgreement = agreement;
+    
+    openAgreementModal('Agreement Details', modalHtml);
+  };
+
+  const terminateAgreement = async (agreementId) => {
+    const confirmed = window.confirm('Are you sure you want to terminate this agreement? This action cannot be undone.');
+    if (confirmed) {
+      try {
+        // In a real implementation, this would call the termination API
+        console.log('Terminating agreement:', agreementId);
+        alert('Agreement termination request submitted. You will receive a confirmation shortly.');
+        fetchUserAgreements(); // Refresh list
+      } catch (err) {
+        console.error('Error terminating agreement:', err);
+        alert('Failed to terminate agreement');
+      }
+    }
+  };
+
+  const signAgreement = async (agreementId) => {
+    const confirmed = window.confirm('Do you want to sign this agreement electronically?');
+    if (confirmed) {
+      try {
+        // In a real implementation, this would call the signing API
+        console.log('Signing agreement:', agreementId);
+        alert('Agreement signed successfully! A copy has been sent to your email.');
+        fetchUserAgreements(); // Refresh list
+      } catch (err) {
+        console.error('Error signing agreement:', err);
+        alert('Failed to sign agreement');
+      }
+    }
+  };
+
+  const scheduleService = async (agreement) => {
+    const date = prompt('Enter preferred service date (YYYY-MM-DD):');
+    if (date) {
+      try {
+        // In a real implementation, this would call the scheduling API
+        console.log('Scheduling service for agreement:', agreement._id, 'on:', date);
+        alert(`Service scheduled for ${new Date(date).toLocaleDateString()}. You will receive a confirmation.`);
+      } catch (err) {
+        console.error('Error scheduling service:', err);
+        alert('Failed to schedule service');
+      }
+    }
+  };
+
+  const cancelAgreement = async (agreementId) => {
+    const reason = prompt('Please provide a reason for cancellation:');
+    if (reason) {
+      const confirmed = window.confirm('Are you sure you want to cancel this agreement?');
+      if (confirmed) {
+        try {
+          // In a real implementation, this would call the cancellation API
+          console.log('Cancelling agreement:', agreementId, 'Reason:', reason);
+          alert('Agreement cancellation request submitted. You will receive a confirmation shortly.');
+          fetchUserAgreements(); // Refresh list
+        } catch (err) {
+          console.error('Error cancelling agreement:', err);
+          alert('Failed to cancel agreement');
+        }
+      }
+    }
+  };
+
+  const autoGeneratePurchaseAgreement = async (propertyId, buyerId) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/agreements/auto-generate-purchase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`,
+        },
+        body: JSON.stringify({ propertyId, buyerId })
+      });
+      
+      if (response.ok) {
+        const agreement = await response.json();
+        alert('Purchase agreement generated successfully! Check your agreements section.');
+        fetchUserAgreements(); // Refresh agreements list
+        return agreement;
+      } else {
+        alert('Failed to generate purchase agreement');
+      }
+    } catch (err) {
+      console.error('Error generating purchase agreement:', err);
+      alert('Failed to generate purchase agreement');
+    }
+  };
+
+  const autoGenerateLeaseAgreement = async (propertyId, tenantId) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/agreements/auto-generate-lease', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || 'demo-token'}`,
+        },
+        body: JSON.stringify({ propertyId, tenantId })
+      });
+      
+      if (response.ok) {
+        const agreement = await response.json();
+        alert('Lease agreement generated successfully! Check your agreements section.');
+        fetchUserAgreements(); // Refresh agreements list
+        return agreement;
+      } else {
+        alert('Failed to generate lease agreement');
+      }
+    } catch (err) {
+      console.error('Error generating lease agreement:', err);
+      alert('Failed to generate lease agreement');
+    }
+  };
+
+  // File upload handlers
+  const handleFileUpload = (event) => {
+    const files = event.target.files;
+    if (files.length > 0) {
+      const file = files[0];
+      
+      // Check file type and size
+      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      
+      if (!allowedTypes.includes(file.type)) {
+        alert('Invalid file type. Please upload PDF, DOC, DOCX, JPG, or PNG files.');
+        return;
+      }
+      
+      if (file.size > maxSize) {
+        alert('File size exceeds 10MB limit.');
+        return;
+      }
+      
+      // Handle file upload
+      uploadAgreementDocument(file);
+    }
+  };
+
+  const uploadAgreementDocument = async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('type', 'agreement');
+      
+      // Show upload progress
+      const progressMessage = `Uploading "${file.name}"...`;
+      console.log(progressMessage);
+      
+      // Simulate upload progress
+      setTimeout(() => {
+        alert(`File "${file.name}" uploaded successfully! The agreement has been added to your list.`);
+        fetchUserAgreements(); // Refresh agreements list
+      }, 1500);
+      
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      alert('Failed to upload file');
+    }
+  };
+
+  const handleScanDocument = () => {
+    // In a real implementation, this would integrate with device camera or scanning API
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      alert('Camera access would be requested here to scan documents. For now, please use the file upload option.');
+    } else {
+      alert('Scanning feature is not supported on this device. Please use the file upload option.');
+    }
+  };
+
+  const triggerPropertyPurchase = async (property) => {
+    if (!user?.id) {
+      alert('Please login to purchase property');
+      return;
+    }
+    
+    const confirmed = window.confirm(`Are you sure you want to purchase "${property.name}" for NPR ${property.salePrice?.toLocaleString()}?\n\nA purchase agreement will be automatically generated.`);
+    if (confirmed) {
+      await autoGeneratePurchaseAgreement(property._id, user.id);
+    }
+  };
+
+  const triggerPropertyRental = async (property) => {
+    if (!user?.id) {
+      alert('Please login to rent property');
+      return;
+    }
+    
+    const confirmed = window.confirm(`Are you sure you want to rent "${property.name}" for NPR ${property.monthlyRent?.toLocaleString()}/month?\n\nA lease agreement will be automatically generated.`);
+    if (confirmed) {
+      await autoGenerateLeaseAgreement(property._id, user.id);
+    }
+  };
+
+  const createNewAgreement = () => {
+    // Show professional agreement type selection modal
+    showAgreementTypeSelection();
+  };
+
+  const showAgreementTypeSelection = () => {
+    const modalHtml = `
+      <div style="padding: 32px; max-width: 700px; margin: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h2 style="margin: 0 0 8px 0; color: #1f2937; font-size: 24px; font-weight: 700;">Create New Agreement</h2>
+          <p style="margin: 0; color: #6b7280; font-size: 16px;">Choose the type of agreement you want to create</p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          <div class="agreement-type-card" data-type="lease" style="
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+          ">
+            <div style="font-size: 48px; margin-bottom: 16px;">🏠</div>
+            <h3 style="margin: 0 0 8px 0; color: white; font-size: 18px; font-weight: 600;">Lease Agreement</h3>
+            <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px; line-height: 1.5;">Create rental agreements for properties</p>
+          </div>
+          
+          <div class="agreement-type-card" data-type="purchase" style="
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+          ">
+            <div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+            <h3 style="margin: 0 0 8px 0; color: white; font-size: 18px; font-weight: 600;">Purchase Agreement</h3>
+            <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px; line-height: 1.5;">Create property purchase contracts</p>
+          </div>
+          
+          <div class="agreement-type-card" data-type="maintenance" style="
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+          ">
+            <div style="font-size: 48px; margin-bottom: 16px;">🔧</div>
+            <h3 style="margin: 0 0 8px 0; color: white; font-size: 18px; font-weight: 600;">Maintenance Agreement</h3>
+            <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px; line-height: 1.5;">Create service and maintenance contracts</p>
+          </div>
+          
+          <div class="agreement-type-card" data-type="termination" style="
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+          ">
+            <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+            <h3 style="margin: 0 0 8px 0; color: white; font-size: 18px; font-weight: 600;">Termination Notice</h3>
+            <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px; line-height: 1.5;">Create termination notices</p>
+          </div>
+          
+          <div class="agreement-type-card" data-type="upload" style="
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+          ">
+            <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+            <h3 style="margin: 0 0 8px 0; color: white; font-size: 18px; font-weight: 600;">Upload Document</h3>
+            <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px; line-height: 1.5;">Upload existing signed documents</p>
+          </div>
+        </div>
+        
+        <div style="text-align: center;">
+          <button onclick="window.parent.closeAgreementForm()" style="
+            background: #f3f4f6;
+            color: #374151;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+          ">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    openAgreementModal('Select Agreement Type', modalHtml);
+    
+    // Add hover effects and click handlers
+    setTimeout(() => {
+      const cards = document.querySelectorAll('.agreement-type-card');
+      cards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+          card.style.transform = 'translateY(-4px)';
+          card.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+        });
+        
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = 'translateY(0)';
+          card.style.boxShadow = 'none';
+        });
+        
+        card.addEventListener('click', () => {
+          const type = card.dataset.type;
+          closeAgreementForm();
+          
+          switch(type) {
+            case 'lease':
+              showLeaseAgreementForm();
+              break;
+            case 'purchase':
+              showPurchaseAgreementForm();
+              break;
+            case 'maintenance':
+              showMaintenanceAgreementForm();
+              break;
+            case 'termination':
+              showTerminationForm();
+              break;
+            case 'upload':
+              showDocumentUploadForm();
+              break;
+          }
+        });
+      });
+    }, 100);
+  };
+
+  const showLeaseAgreementForm = () => {
+    const formHtml = `
+      <div style="padding: 32px; max-width: 600px; margin: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h2 style="margin: 0 0 8px 0; color: #1f2937; font-size: 24px; font-weight: 700;">Lease Agreement</h2>
+          <p style="margin: 0; color: #6b7280; font-size: 16px;">Create a rental agreement for your property</p>
+        </div>
+        
+        <form id="leaseForm" style="display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Property Name *</label>
+              <input type="text" id="propertyName" required style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+                box-sizing: border-box;
+              " placeholder="e.g., Modern Thamel Apartment">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Property Address</label>
+              <input type="text" id="propertyAddress" style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+                box-sizing: border-box;
+              " placeholder="e.g., Thamel, Kathmandu">
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Landlord Name *</label>
+              <input type="text" id="landlordName" required style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+                box-sizing: border-box;
+              " placeholder="Landlord full name">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Tenant Name *</label>
+              <input type="text" id="tenantName" required style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+                box-sizing: border-box;
+              " placeholder="Tenant full name">
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Monthly Rent (NPR) *</label>
+              <input type="number" id="rentAmount" required min="0" style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+                box-sizing: border-box;
+              " placeholder="25000">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Security Deposit (NPR)</label>
+              <input type="number" id="depositAmount" min="0" style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+                box-sizing: border-box;
+              " placeholder="50000">
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Lease Duration *</label>
+              <select id="duration" required style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+                box-sizing: border-box;
+                background: white;
+              ">
+                <option value="">Select duration</option>
+                <option value="6 months">6 months</option>
+                <option value="12 months">12 months</option>
+                <option value="18 months">18 months</option>
+                <option value="24 months">24 months</option>
+                <option value="36 months">36 months</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Start Date *</label>
+              <input type="date" id="startDate" required style="
+                width: 100%;
+                padding: 12px 16px;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.2s ease;
+                box-sizing: border-box;
+              ">
+            </div>
+          </div>
+          
+          <div>
+            <label style="display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500;">Special Terms & Conditions</label>
+            <textarea id="specialTerms" rows="4" style="
+              width: 100%;
+              padding: 12px 16px;
+              border: 2px solid #e5e7eb;
+              border-radius: 8px;
+              font-size: 14px;
+              transition: border-color 0.2s ease;
+              box-sizing: border-box;
+              resize: vertical;
+            " placeholder="Any special terms or conditions..."></textarea>
+          </div>
+          
+          <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+            <button type="button" onclick="window.closeAgreementModal()" style="
+              background: #f3f4f6;
+              color: #374151;
+              padding: 12px 24px;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: background 0.2s ease;
+            ">Cancel</button>
+            <button type="button" onclick="window.parent.createLeaseAgreement()" style="
+              background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+              color: white;
+              padding: 12px 24px;
+              border: none;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            ">Create Agreement</button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    openAgreementModal('Create Lease Agreement', formHtml);
+    
+    // Add input focus effects
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('#leaseForm input, #leaseForm select, #leaseForm textarea');
+      inputs.forEach(input => {
+        input.addEventListener('focus', () => {
+          input.style.borderColor = '#3b82f6';
+          input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+        });
+        
+        input.addEventListener('blur', () => {
+          input.style.borderColor = '#e5e7eb';
+          input.style.boxShadow = 'none';
+        });
+      });
+    }, 100);
+  };
+
+  const showPurchaseAgreementForm = () => {
+    const formHtml = `
+      <div style="padding: 20px; max-width: 600px; margin: auto;">
+        <h3>Purchase Agreement Form</h3>
+        <div style="margin: 15px 0;">
+          <label>Property Name:</label>
+          <input type="text" id="propertyName" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Buyer Name:</label>
+          <input type="text" id="buyerName" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Seller Name:</label>
+          <input type="text" id="sellerName" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Purchase Price (NPR):</label>
+          <input type="number" id="purchasePrice" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Payment Method:</label>
+          <select id="paymentMethod" style="width: 100%; padding: 8px; margin: 5px 0;">
+            <option>Bank Transfer</option>
+            <option>Cash</option>
+            <option>Installment</option>
+            <option>Check</option>
+          </select>
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Completion Date:</label>
+          <input type="date" id="completionDate" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 20px 0;">
+          <button onclick="window.parent.createPurchaseAgreement()" style="background: #10b981; color: white; padding: 10px 20px; border: none; margin-right: 10px;">Create Agreement</button>
+          <button onclick="window.parent.closeAgreementForm()" style="background: #6b7280; color: white; padding: 10px 20px; border: none;">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    openAgreementModal('Create Purchase Agreement', formHtml);
+  };
+
+  const showMaintenanceAgreementForm = () => {
+    const formHtml = `
+      <div style="padding: 20px; max-width: 600px; margin: auto;">
+        <h3>Maintenance Agreement Form</h3>
+        <div style="margin: 15px 0;">
+          <label>Property Name:</label>
+          <input type="text" id="propertyName" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Service Provider:</label>
+          <input type="text" id="serviceProvider" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Service Type:</label>
+          <input type="text" id="serviceType" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Monthly Cost (NPR):</label>
+          <input type="number" id="monthlyCost" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Service Frequency:</label>
+          <select id="frequency" style="width: 100%; padding: 8px; margin: 5px 0;">
+            <option>Weekly</option>
+            <option>Monthly</option>
+            <option>Quarterly</option>
+            <option>Annually</option>
+          </select>
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Next Service Date:</label>
+          <input type="date" id="nextServiceDate" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 20px 0;">
+          <button onclick="window.parent.createMaintenanceAgreement()" style="background: #10b981; color: white; padding: 10px 20px; border: none; margin-right: 10px;">Create Agreement</button>
+          <button onclick="window.parent.closeAgreementForm()" style="background: #6b7280; color: white; padding: 10px 20px; border: none;">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    openAgreementModal('Create Maintenance Agreement', formHtml);
+  };
+
+  const showTerminationForm = () => {
+    const formHtml = `
+      <div style="padding: 20px; max-width: 600px; margin: auto;">
+        <h3>Termination Notice Form</h3>
+        <div style="margin: 15px 0;">
+          <label>Property Name:</label>
+          <input type="text" id="propertyName" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Termination Reason:</label>
+          <textarea id="terminationReason" style="width: 100%; padding: 8px; margin: 5px 0; min-height: 80px;"></textarea>
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Notice Period:</label>
+          <select id="noticePeriod" style="width: 100%; padding: 8px; margin: 5px 0;">
+            <option>15 days</option>
+            <option>30 days</option>
+            <option>60 days</option>
+            <option>90 days</option>
+          </select>
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Notice Date:</label>
+          <input type="date" id="noticeDate" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Effective Date:</label>
+          <input type="date" id="effectiveDate" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 20px 0;">
+          <button onclick="window.parent.createTerminationNotice()" style="background: #10b981; color: white; padding: 10px 20px; border: none; margin-right: 10px;">Create Notice</button>
+          <button onclick="window.parent.closeAgreementForm()" style="background: #6b7280; color: white; padding: 10px 20px; border: none;">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    openAgreementModal('Create Termination Notice', formHtml);
+  };
+
+  const showDocumentUploadForm = () => {
+    const formHtml = `
+      <div style="padding: 20px; max-width: 600px; margin: auto;">
+        <h3>Upload Agreement Document</h3>
+        <div style="margin: 15px 0;">
+          <label>Agreement Title:</label>
+          <input type="text" id="documentTitle" placeholder="e.g., Rental Agreement - Modern Apartment" style="width: 100%; padding: 8px; margin: 5px 0;">
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Agreement Type:</label>
+          <select id="agreementType" style="width: 100%; padding: 8px; margin: 5px 0;">
+            <option value="lease">Lease Agreement</option>
+            <option value="purchase">Purchase Agreement</option>
+            <option value="maintenance">Maintenance Agreement</option>
+            <option value="termination">Termination Notice</option>
+            <option value="custom">Custom Agreement</option>
+          </select>
+        </div>
+        <div style="margin: 15px 0;">
+          <label>Choose File:</label>
+          <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="width: 100%; padding: 8px; margin: 5px 0;">
+          <small style="color: #6b7280;">Supported formats: PDF, DOC, DOCX, JPG, PNG (Max 10MB)</small>
+        </div>
+        <div style="margin: 15px 0; padding: 15px; background: #f3f4f6; border-radius: 8px;">
+          <h4 style="margin: 0 0 10px 0;">Or Scan Document</h4>
+          <button type="button" onclick="window.parent.startDocumentScanning()" style="background: #3b82f6; color: white; padding: 8px 16px; border: none; border-radius: 4px;">
+            📷 Start Scanning
+          </button>
+          <small style="display: block; margin-top: 8px; color: #6b7280;">Use your device camera to scan documents</small>
+        </div>
+        <div style="margin: 20px 0;">
+          <button onclick="window.parent.uploadDocument()" style="background: #10b981; color: white; padding: 10px 20px; border: none; margin-right: 10px;">Upload Document</button>
+          <button onclick="window.parent.closeAgreementForm()" style="background: #6b7280; color: white; padding: 10px 20px; border: none;">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    openAgreementModal('Upload Agreement Document', formHtml);
+  };
+
+  const openAgreementModal = (title, content) => {
+    // Create modal overlay
+    const modalOverlay = document.createElement('div');
+    modalOverlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    `;
+    
+    // Create modal content
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+      background: white;
+      border-radius: 12px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    `;
+    
+    modalContent.innerHTML = content;
+    modalOverlay.appendChild(modalContent);
+    document.body.appendChild(modalOverlay);
+    
+    // Store reference for cleanup
+    window.currentAgreementModal = modalOverlay;
+    
+    // Close on overlay click
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) {
+        closeAgreementForm();
+      }
+    });
+  };
+
+  const closeAgreementForm = () => {
+    if (window.currentAgreementModal) {
+      document.body.removeChild(window.currentAgreementModal);
+      window.currentAgreementModal = null;
+    }
+  };
+
+  // Global functions for modal buttons
+  window.createLeaseAgreement = () => {
+    const propertyName = document.getElementById('propertyName')?.value;
+    const propertyAddress = document.getElementById('propertyAddress')?.value;
+    const landlordName = document.getElementById('landlordName')?.value;
+    const tenantName = document.getElementById('tenantName')?.value;
+    const rentAmount = document.getElementById('rentAmount')?.value;
+    const depositAmount = document.getElementById('depositAmount')?.value;
+    const duration = document.getElementById('duration')?.value;
+    const startDate = document.getElementById('startDate')?.value;
+    const specialTerms = document.getElementById('specialTerms')?.value;
+    
+    if (!propertyName || !landlordName || !tenantName || !rentAmount || !duration || !startDate) {
+      alert('Please fill in all required fields marked with *');
+      return;
+    }
+    
+    // Create lease agreement and add to agreements list
+    const newAgreement = {
+      _id: Date.now().toString(),
+      type: 'lease',
+      title: `Lease Agreement - ${propertyName}`,
+      status: 'active',
+      property: {
+        name: propertyName,
+        address: propertyAddress || 'Not specified'
+      },
+      parties: {
+        landlord: {
+          fullName: landlordName
+        },
+        tenant: {
+          fullName: tenantName
+        }
+      },
+      terms: {
+        rentAmount: parseInt(rentAmount),
+        securityDeposit: parseInt(depositAmount) || 0,
+        duration: duration,
+        specialTerms: specialTerms || ''
+      },
+      dates: {
+        startDate: startDate,
+        endDate: calculateEndDate(startDate, duration)
+      },
+      createdAt: new Date().toISOString()
+    };
+    
+    // Add to agreements list
+    setAgreements(prev => [...prev, newAgreement]);
+    
+    console.log('Creating lease agreement:', newAgreement);
+    alert('Lease agreement created successfully!');
+    closeAgreementForm();
+  };
+
+  window.createPurchaseAgreement = () => {
+    const propertyName = document.getElementById('propertyName')?.value;
+    const buyerName = document.getElementById('buyerName')?.value;
+    const sellerName = document.getElementById('sellerName')?.value;
+    const purchasePrice = document.getElementById('purchasePrice')?.value;
+    const paymentMethod = document.getElementById('paymentMethod')?.value;
+    const completionDate = document.getElementById('completionDate')?.value;
+    
+    if (!propertyName || !buyerName || !sellerName || !purchasePrice || !completionDate) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    // Create purchase agreement
+    const newAgreement = {
+      _id: Date.now().toString(),
+      type: 'purchase',
+      title: `Purchase Agreement - ${propertyName}`,
+      status: 'pending',
+      property: {
+        name: propertyName
+      },
+      parties: {
+        buyer: {
+          fullName: buyerName
+        },
+        seller: {
+          fullName: sellerName
+        }
+      },
+      terms: {
+        purchasePrice: parseInt(purchasePrice),
+        paymentMethod: paymentMethod
+      },
+      dates: {
+        signingDate: new Date().toISOString().split('T')[0],
+        endDate: completionDate
+      },
+      createdAt: new Date().toISOString()
+    };
+    
+    setAgreements(prev => [...prev, newAgreement]);
+    
+    console.log('Creating purchase agreement:', newAgreement);
+    alert('Purchase agreement created successfully!');
+    closeAgreementForm();
+  };
+
+  window.createMaintenanceAgreement = () => {
+    const propertyName = document.getElementById('propertyName')?.value;
+    const serviceProvider = document.getElementById('serviceProvider')?.value;
+    const serviceType = document.getElementById('serviceType')?.value;
+    const monthlyCost = document.getElementById('monthlyCost')?.value;
+    const frequency = document.getElementById('frequency')?.value;
+    const nextServiceDate = document.getElementById('nextServiceDate')?.value;
+    
+    if (!propertyName || !serviceProvider || !serviceType || !monthlyCost) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    // Create maintenance agreement
+    const newAgreement = {
+      _id: Date.now().toString(),
+      type: 'maintenance',
+      title: `Maintenance Agreement - ${serviceType}`,
+      status: 'active',
+      property: {
+        name: propertyName
+      },
+      parties: {
+        service_provider: {
+          fullName: serviceProvider
+        }
+      },
+      terms: {
+        serviceDetails: {
+          serviceType: serviceType,
+          cost: parseInt(monthlyCost),
+          frequency: frequency,
+          nextServiceDate: nextServiceDate
+        }
+      },
+      createdAt: new Date().toISOString()
+    };
+    
+    setAgreements(prev => [...prev, newAgreement]);
+    
+    console.log('Creating maintenance agreement:', newAgreement);
+    alert('Maintenance agreement created successfully!');
+    closeAgreementForm();
+  };
+
+  window.createTerminationNotice = () => {
+    const propertyName = document.getElementById('propertyName')?.value;
+    const terminationReason = document.getElementById('terminationReason')?.value;
+    const noticePeriod = document.getElementById('noticePeriod')?.value;
+    const noticeDate = document.getElementById('noticeDate')?.value;
+    const effectiveDate = document.getElementById('effectiveDate')?.value;
+    
+    if (!propertyName || !terminationReason || !noticeDate || !effectiveDate) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    // Create termination notice
+    const newAgreement = {
+      _id: Date.now().toString(),
+      type: 'termination',
+      title: `Termination Notice - ${propertyName}`,
+      status: 'pending',
+      property: {
+        name: propertyName
+      },
+      terms: {
+        terminationReason: terminationReason,
+        noticePeriod: noticePeriod
+      },
+      dates: {
+        noticeDate: noticeDate,
+        effectiveDate: effectiveDate
+      },
+      createdAt: new Date().toISOString()
+    };
+    
+    setAgreements(prev => [...prev, newAgreement]);
+    
+    console.log('Creating termination notice:', newAgreement);
+    alert('Termination notice created successfully!');
+    closeAgreementForm();
+  };
+
+  window.uploadDocument = () => {
+    const documentTitle = document.getElementById('documentTitle')?.value;
+    const agreementType = document.getElementById('agreementType')?.value;
+    const fileInput = document.getElementById('fileInput');
+    
+    if (!documentTitle || !fileInput.files.length) {
+      alert('Please provide a title and select a file');
+      return;
+    }
+    
+    const file = fileInput.files[0];
+    
+    // Check file type and size
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (!allowedTypes.includes(file.type)) {
+      alert('Invalid file type. Please upload PDF, DOC, DOCX, JPG, or PNG files.');
+      return;
+    }
+    
+    if (file.size > maxSize) {
+      alert('File size exceeds 10MB limit.');
+      return;
+    }
+    
+    // Create uploaded document agreement
+    const newAgreement = {
+      _id: Date.now().toString(),
+      type: agreementType,
+      title: documentTitle,
+      status: 'active',
+      document: {
+        fileName: file.name,
+        fileType: file.type,
+        uploadedAt: new Date().toISOString()
+      },
+      createdAt: new Date().toISOString()
+    };
+    
+    setAgreements(prev => [...prev, newAgreement]);
+    
+    console.log('Uploading document:', { documentTitle, agreementType, file: file.name });
+    alert(`Document "${file.name}" uploaded successfully!`);
+    closeAgreementForm();
+  };
+
+  // Helper function to calculate end date
+  const calculateEndDate = (startDate, duration) => {
+    const start = new Date(startDate);
+    let months = 0;
+    
+    switch(duration) {
+      case '6 months': months = 6; break;
+      case '12 months': months = 12; break;
+      case '18 months': months = 18; break;
+      case '24 months': months = 24; break;
+      case '36 months': months = 36; break;
+      default: months = 12;
+    }
+    
+    const endDate = new Date(start);
+    endDate.setMonth(endDate.getMonth() + months);
+    return endDate.toISOString().split('T')[0];
+  };
+
+  window.startDocumentScanning = () => {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      alert('Camera access would be requested here to scan documents. This feature would open your device camera to capture documents.');
+    } else {
+      alert('Scanning feature is not supported on this device. Please use the file upload option.');
+    }
+  };
+
+  // Additional global functions for the agreement detail modal
+  window.downloadCurrentAgreement = () => {
+    if (window.currentViewingAgreement) {
+      downloadAgreement(window.currentViewingAgreement._id, window.currentViewingAgreement.title);
+    }
+  };
+
+  window.printCurrentAgreement = () => {
+    if (window.currentViewingAgreement) {
+      printAgreement(window.currentViewingAgreement._id, window.currentViewingAgreement.title);
+    }
+  };
+
+  // Add global close modal function
+  window.closeAgreementModal = () => {
+    if (window.currentAgreementModal) {
+      document.body.removeChild(window.currentAgreementModal);
+      window.currentAgreementModal = null;
+    }
+  };
+
+  // Load agreements when agreements tab is active
+  useEffect(() => {
+    if (active === "lease" && userType === "user") {
+      fetchUserAgreements();
+    }
+  }, [active, userType]);
+
   const handlePropertyImageChange = (e) => {
     const files = Array.from(e.target.files);
     const newImages = files.map(file => URL.createObjectURL(file));
@@ -417,7 +1886,7 @@ const Dashboard = () => {
                    key === "view-listings" ? "Browse Properties" :
                    key === "pay-rent" ? "Pay Rent" :
                    key === "maintenance" ? "Request Maintenance" :
-                   key === "lease" ? "Lease Agreement" :
+                   key === "lease" ? "Agreements" :
                    key === "contact" ? "Contact Landlord" :
                    key === "chat" ? "Chat" :
                    key === "profile" ? "Profile" :
@@ -722,6 +2191,451 @@ const Dashboard = () => {
           </div>
         )}
 
+        {active === "lease" && (
+          <div className="max-w-6xl mx-auto p-6">
+            <div className="bg-white rounded-xl shadow-lg p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Agreements & Documents</h2>
+                <button 
+                  onClick={createNewAgreement}
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 font-medium"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H8m8 8l-4-4m4 4l-4 4" />
+                  </svg>
+                  Create New Agreement
+                </button>
+              </div>
+              
+              {/* Agreement Type Tabs */}
+              <div className="border-b border-gray-200 mb-6">
+                <nav className="-mb-px flex space-x-8">
+                  {['lease', 'purchase', 'maintenance', 'termination'].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setAgreementType(type)}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm capitalize ${
+                        agreementType === type
+                          ? 'border-primary text-primary'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      {type === 'lease' && 'Lease Agreements'}
+                      {type === 'purchase' && 'Purchase Agreements'}
+                      {type === 'maintenance' && 'Maintenance Agreements'}
+                      {type === 'termination' && 'Termination Notices'}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Agreement Content Based on Type */}
+              {agreementType === 'lease' && (
+                <div className="space-y-6">
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">My Lease Agreements</h3>
+                    {loading ? (
+                      <div className="flex justify-center items-center h-32">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {(Array.isArray(agreements) ? agreements.filter(a => a.type === 'lease') : []).map((agreement) => (
+                          <div key={agreement._id} className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-gray-900">{agreement.title}</h4>
+                                <p className="text-sm text-gray-600">{agreement.property?.name || 'Property Details'}</p>
+                              </div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                agreement.status === 'active' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : agreement.status === 'expired'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {agreement.status}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-gray-500">Landlord</p>
+                                <p className="font-medium">{agreement.parties?.landlord?.fullName || 'Not specified'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Monthly Rent</p>
+                                <p className="font-medium text-blue-600">NPR {agreement.terms?.rentAmount?.toLocaleString() || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Security Deposit</p>
+                                <p className="font-medium text-green-600">NPR {agreement.terms?.securityDeposit?.toLocaleString() || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Duration</p>
+                                <p className="font-medium">{agreement.terms?.duration || 'N/A'}</p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm mt-3">
+                              <div>
+                                <p className="text-gray-500">Start Date</p>
+                                <p className="font-medium">{agreement.dates?.startDate ? new Date(agreement.dates.startDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">End Date</p>
+                                <p className="font-medium">{agreement.dates?.endDate ? new Date(agreement.dates.endDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                              <button 
+                                onClick={() => viewFullAgreement(agreement)}
+                                className="flex-1 bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm"
+                              >
+                                View Full Agreement
+                              </button>
+                              <button 
+                                onClick={() => downloadAgreement(agreement._id, agreement.title)}
+                                className="flex-1 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                              >
+                                Download PDF
+                              </button>
+                              <button 
+                                onClick={() => printAgreement(agreement._id, agreement.title)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                              >
+                                Print
+                              </button>
+                              <button 
+                                onClick={() => terminateAgreement(agreement._id)}
+                                className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-medium text-sm"
+                              >
+                                Terminate
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {agreements.filter(a => a.type === 'lease').length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-gray-600">No lease agreements found</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {agreementType === 'purchase' && (
+                <div className="space-y-6">
+                  <div className="bg-blue-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">My Purchase Agreements</h3>
+                    {loading ? (
+                      <div className="flex justify-center items-center h-32">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {(Array.isArray(agreements) ? agreements.filter(a => a.type === 'purchase') : []).map((agreement) => (
+                          <div key={agreement._id} className="bg-white rounded-lg p-4 border border-blue-200 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-gray-900">{agreement.title}</h4>
+                                <p className="text-sm text-gray-600">{agreement.property?.name || 'Property Details'}</p>
+                              </div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                agreement.status === 'completed' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : agreement.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {agreement.status}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-gray-500">Buyer</p>
+                                <p className="font-medium">{agreement.parties?.buyer?.fullName || 'You'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Seller</p>
+                                <p className="font-medium">{agreement.parties?.seller?.fullName || 'Not specified'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Purchase Price</p>
+                                <p className="font-medium text-blue-600">NPR {agreement.terms?.purchasePrice?.toLocaleString() || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Payment Method</p>
+                                <p className="font-medium">{agreement.terms?.paymentMethod || 'N/A'}</p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm mt-3">
+                              <div>
+                                <p className="text-gray-500">Signing Date</p>
+                                <p className="font-medium">{agreement.dates?.signingDate ? new Date(agreement.dates.signingDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Completion Date</p>
+                                <p className="font-medium">{agreement.dates?.endDate ? new Date(agreement.dates.endDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                              <button 
+                                onClick={() => viewFullAgreement(agreement)}
+                                className="flex-1 bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm"
+                              >
+                                View Full Agreement
+                              </button>
+                              <button 
+                                onClick={() => downloadAgreement(agreement._id, agreement.title)}
+                                className="flex-1 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                              >
+                                Download PDF
+                              </button>
+                              <button 
+                                onClick={() => printAgreement(agreement._id, agreement.title)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                              >
+                                Print
+                              </button>
+                              <button 
+                                onClick={() => signAgreement(agreement._id)}
+                                className="px-3 py-2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 font-medium text-sm"
+                              >
+                                Sign
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {agreements.filter(a => a.type === 'purchase').length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-gray-600">No purchase agreements found</p>
+                            <p className="text-sm text-gray-500 mt-2">Purchase agreements will appear here when you buy properties</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {agreementType === 'maintenance' && (
+                <div className="space-y-6">
+                  <div className="bg-yellow-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Maintenance Agreements</h3>
+                    {loading ? (
+                      <div className="flex justify-center items-center h-32">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {(Array.isArray(agreements) ? agreements.filter(a => a.type === 'maintenance') : []).map((agreement) => (
+                          <div key={agreement._id} className="bg-white rounded-lg p-4 border border-yellow-200 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-gray-900">{agreement.title}</h4>
+                                <p className="text-sm text-gray-600">{agreement.property?.name || 'Property Details'}</p>
+                              </div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                agreement.status === 'active' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {agreement.status}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-gray-500">Service Provider</p>
+                                <p className="font-medium">{agreement.parties?.service_provider?.fullName || 'Not specified'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Cost</p>
+                                <p className="font-medium text-blue-600">NPR {agreement.terms?.serviceDetails?.cost?.toLocaleString() || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Frequency</p>
+                                <p className="font-medium">{agreement.terms?.serviceDetails?.frequency || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Next Service</p>
+                                <p className="font-medium">{agreement.terms?.serviceDetails?.nextServiceDate ? new Date(agreement.terms.serviceDetails.nextServiceDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                              <button 
+                                onClick={() => viewFullAgreement(agreement)}
+                                className="flex-1 bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm"
+                              >
+                                View Full Agreement
+                              </button>
+                              <button 
+                                onClick={() => downloadAgreement(agreement._id, agreement.title)}
+                                className="flex-1 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                              >
+                                Download PDF
+                              </button>
+                              <button 
+                                onClick={() => printAgreement(agreement._id, agreement.title)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                              >
+                                Print
+                              </button>
+                              <button 
+                                onClick={() => scheduleService(agreement)}
+                                className="px-3 py-2 border border-yellow-300 text-yellow-600 rounded-lg hover:bg-yellow-50 font-medium text-sm"
+                              >
+                                Schedule Service
+                              </button>
+                              <button 
+                                onClick={() => cancelAgreement(agreement._id)}
+                                className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-medium text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {agreements.filter(a => a.type === 'maintenance').length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-gray-600">No maintenance agreements found</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {agreementType === 'termination' && (
+                <div className="space-y-6">
+                  <div className="bg-red-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Termination Notices</h3>
+                    {loading ? (
+                      <div className="flex justify-center items-center h-32">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {(Array.isArray(agreements) ? agreements.filter(a => a.type === 'termination') : []).map((agreement) => (
+                          <div key={agreement._id} className="bg-white rounded-lg p-4 border border-red-200 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-gray-900">{agreement.title}</h4>
+                                <p className="text-sm text-gray-600">{agreement.property?.name || 'Property Details'}</p>
+                              </div>
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                agreement.status === 'completed' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : agreement.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {agreement.status}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-gray-500">Reason</p>
+                                <p className="font-medium">{agreement.terms?.terminationReason || 'Not specified'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Notice Date</p>
+                                <p className="font-medium">{agreement.dates?.noticeDate ? new Date(agreement.dates.noticeDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Effective Date</p>
+                                <p className="font-medium">{agreement.dates?.effectiveDate ? new Date(agreement.dates.effectiveDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Notice Period</p>
+                                <p className="font-medium">{agreement.terms?.noticePeriod || 'N/A'}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 mt-4">
+                              <button 
+                                onClick={() => viewFullAgreement(agreement)}
+                                className="flex-1 bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 font-medium text-sm"
+                              >
+                                View Details
+                              </button>
+                              <button 
+                                onClick={() => downloadAgreement(agreement._id, agreement.title)}
+                                className="flex-1 border border-gray-300 px-3 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                              >
+                                Download Notice
+                              </button>
+                              <button 
+                                onClick={() => printAgreement(agreement._id, agreement.title)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm"
+                              >
+                                Print
+                              </button>
+                              {agreement.status === 'pending' && (
+                                <button 
+                                  onClick={() => cancelAgreement(agreement._id)}
+                                  className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-medium text-sm"
+                                >
+                                  Withdraw
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {agreements.filter(a => a.type === 'termination').length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-gray-600">No termination notices found</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Auto-Generation Info */}
+              <div className="mt-6 bg-blue-50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">📋 Automatic Agreement Generation</h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Purchase Properties</p>
+                      <p className="text-sm text-gray-600">When you buy a property, purchase agreements are automatically generated and added here</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Rent Properties</p>
+                      <p className="text-sm text-gray-600">When you rent a property, lease agreements are automatically created</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Create New Agreements</p>
+                      <p className="text-sm text-gray-600">Use the "Create New Agreement" button to generate custom agreements or upload existing documents</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {active === "maintenance" && (
           <div className="max-w-4xl mx-auto p-6">
             <div className="bg-white rounded-xl shadow-lg p-8">
@@ -790,76 +2704,6 @@ const Dashboard = () => {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
-
-        {active === "lease" && (
-          <div className="max-w-4xl mx-auto p-6">
-            <div className="bg-white rounded-xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Lease Agreement</h2>
-              
-              <div className="space-y-6">
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Property Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Property Name</p>
-                      <p className="font-medium">Modern Apartment</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Unit</p>
-                      <p className="font-medium">A-101</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Address</p>
-                      <p className="font-medium">Thamel, Kathmandu</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Monthly Rent</p>
-                      <p className="font-medium text-blue-600">NPR 25,000</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Lease Terms</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Lease Start Date</span>
-                      <span className="font-medium">January 1, 2024</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Lease End Date</span>
-                      <span className="font-medium">December 31, 2024</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Security Deposit</span>
-                      <span className="font-medium text-green-600">NPR 50,000</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Notice Period</span>
-                      <span className="font-medium">30 days</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-center gap-4 mt-8">
-                  <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
-                    Download PDF
-                  </button>
-                  <button className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                    Print
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {active === "contact" && (
-          <div className="max-w-4xl mx-auto p-6">
-            <div className="bg-white rounded-xl shadow-lg p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Landlord</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1149,6 +2993,22 @@ const Dashboard = () => {
                             <button className="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 font-medium transition-colors">
                               View Details
                             </button>
+                            {property.listingType === 'For Sale' || property.listingType === 'For Both' ? (
+                              <button 
+                                onClick={() => triggerPropertyPurchase(property)}
+                                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-medium"
+                              >
+                                Buy Property
+                              </button>
+                            ) : null}
+                            {property.listingType === 'For Rent' || property.listingType === 'For Both' ? (
+                              <button 
+                                onClick={() => triggerPropertyRental(property)}
+                                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
+                              >
+                                Rent Property
+                              </button>
+                            ) : null}
                             <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors">
                               Contact
                             </button>
@@ -1230,6 +3090,22 @@ const Dashboard = () => {
                             <button className="flex-1 bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 font-medium transition-colors text-sm">
                               View Details
                             </button>
+                            {property.listingType === 'For Sale' || property.listingType === 'For Both' ? (
+                              <button 
+                                onClick={() => triggerPropertyPurchase(property)}
+                                className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 font-medium text-sm"
+                              >
+                                Buy Property
+                              </button>
+                            ) : null}
+                            {property.listingType === 'For Rent' || property.listingType === 'For Both' ? (
+                              <button 
+                                onClick={() => triggerPropertyRental(property)}
+                                className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm"
+                              >
+                                Rent Property
+                              </button>
+                            ) : null}
                             <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors text-sm">
                               Contact
                             </button>
