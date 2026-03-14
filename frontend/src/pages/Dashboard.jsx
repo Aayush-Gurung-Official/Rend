@@ -2,6 +2,24 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { updateProfile } from "../services/authService.js";
 
+const STORAGE_KEYS = {
+  maintenanceRequests: "rendMaintenanceRequests",
+  contactMessages: "rendContactMessages",
+  tenantProperties: "rendTenantProperties",
+  rentAccounts: "rendRentAccounts",
+};
+
+const safeJsonParse = (value, fallback) => {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const loadArray = (key) => safeJsonParse(window.localStorage.getItem(key), []);
+const saveArray = (key, value) => window.localStorage.setItem(key, JSON.stringify(value));
+
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [userType, setUserType] = useState(null);
@@ -16,7 +34,11 @@ const Dashboard = () => {
   ]);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [propertyUpdates, setPropertyUpdates] = useState(false);
+  const [paymentReminders, setPaymentReminders] = useState(true);
+  const [marketingCommunications, setMarketingCommunications] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [showContactInfo, setShowContactInfo] = useState(true);
+  const [dataSharing, setDataSharing] = useState(false);
   const [propertyImages, setPropertyImages] = useState([]);
   const [listings, setListings] = useState([]);
   
@@ -89,6 +111,71 @@ const Dashboard = () => {
     }
   ]);
 
+  const [tenantRentalProperties, setTenantRentalProperties] = useState([]);
+
+  // Tenant maintenance requests (UI-only sample data)
+  const [tenantMaintenanceRequests, setTenantMaintenanceRequests] = useState([
+    {
+      id: 1,
+      title: "Leaking kitchen faucet",
+      propertyLabel: "Studio Room - Unit B-205",
+      landlordName: "Suman Shrestha",
+      ownerUsername: "suman",
+      category: "Plumbing",
+      priority: "Medium",
+      status: "Open",
+      date: "2024-03-10",
+      description: "Water is leaking under the sink and pooling inside the cabinet."
+    },
+    {
+      id: 2,
+      title: "Light flickering in bedroom",
+      propertyLabel: "Modern Apartment - Unit A-101",
+      landlordName: "Rajesh Kumar",
+      ownerUsername: "rajesh",
+      category: "Electrical",
+      priority: "Low",
+      status: "Completed",
+      date: "2024-03-05",
+      description: "Bedroom ceiling light flickers sometimes. Please check the switch/wiring."
+    }
+  ]);
+  const [selectedTenantMaintenanceId, setSelectedTenantMaintenanceId] = useState(
+    tenantMaintenanceRequests[0]?.id ?? null
+  );
+  const [tenantMaintenanceDraft, setTenantMaintenanceDraft] = useState({
+    propertyLabel: "Studio Room - Unit B-205",
+    category: "Plumbing",
+    priority: "Emergency",
+    title: "",
+    description: "",
+    preferredDateTime: "",
+  });
+  const [tenantMaintenanceErrors, setTenantMaintenanceErrors] = useState({});
+  const [tenantMaintenanceSuccess, setTenantMaintenanceSuccess] = useState("");
+
+  const [selectedContactPropertyId, setSelectedContactPropertyId] = useState(
+    null
+  );
+  const [contactDraft, setContactDraft] = useState({ subject: "", message: "" });
+  const [contactSuccess, setContactSuccess] = useState("");
+
+  const [rentAccounts, setRentAccounts] = useState([]);
+  const [selectedRentAccountId, setSelectedRentAccountId] = useState(null);
+  const [rentDraft, setRentDraft] = useState({
+    propertyId: "",
+    propertyLabel: "",
+    ownerUsername: "",
+    landlordName: "",
+    monthlyRent: "",
+    dueDay: "15",
+  });
+  const [rentSuccess, setRentSuccess] = useState("");
+
+  const [ownerMaintenanceItems, setOwnerMaintenanceItems] = useState([]);
+  const [selectedOwnerThreadKey, setSelectedOwnerThreadKey] = useState(null);
+  const [ownerReplyDraft, setOwnerReplyDraft] = useState("");
+
   // Initialize listings from localStorage
   useEffect(() => {
     const storedProperties = JSON.parse(localStorage.getItem('properties') || '[]');
@@ -131,8 +218,270 @@ const Dashboard = () => {
   const [profileImagePreview, setProfileImagePreview] = useState(null);
   const fileInputRef = useRef(null);
   const propertyImageInputRef = useRef(null);
+  const tenantMaintenanceFormRef = useRef(null);
 
   const navigate = useNavigate();
+
+  const openNewTenantMaintenanceRequest = () => {
+    setTenantMaintenanceSuccess("");
+    setTenantMaintenanceErrors({});
+    setSelectedTenantMaintenanceId(null);
+    setTenantMaintenanceDraft({
+      propertyLabel: tenantRentalProperties[0]?.label ?? "",
+      category: "Plumbing",
+      priority: "Emergency",
+      title: "",
+      description: "",
+      preferredDateTime: "",
+    });
+
+    requestAnimationFrame(() => {
+      tenantMaintenanceFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const submitTenantMaintenanceRequest = (e) => {
+    e.preventDefault();
+    setTenantMaintenanceSuccess("");
+
+    const nextErrors = {};
+    if (!tenantMaintenanceDraft.propertyLabel) nextErrors.propertyLabel = "Please select a property.";
+    if (!tenantMaintenanceDraft.title.trim()) nextErrors.title = "Please enter a short title.";
+    if (!tenantMaintenanceDraft.description.trim()) nextErrors.description = "Please describe the issue.";
+    setTenantMaintenanceErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+
+    const selectedProperty =
+      tenantRentalProperties.find((p) => p.label === tenantMaintenanceDraft.propertyLabel) ??
+      tenantRentalProperties[0] ??
+      null;
+
+    const landlordName = selectedProperty?.landlord?.name || "Landlord";
+    const ownerUsername = selectedProperty?.landlord?.username || "";
+    const propertyId = selectedProperty?.id || "";
+
+    const newRequest = {
+      id: Date.now(),
+      title: tenantMaintenanceDraft.title.trim(),
+      propertyLabel: tenantMaintenanceDraft.propertyLabel,
+      landlordName,
+      ownerUsername,
+      category: tenantMaintenanceDraft.category,
+      priority: tenantMaintenanceDraft.priority,
+      status: "Open",
+      date: `${yyyy}-${mm}-${dd}`,
+      description: tenantMaintenanceDraft.description.trim(),
+    };
+
+    setTenantMaintenanceRequests((prev) => [newRequest, ...prev]);
+    setSelectedTenantMaintenanceId(newRequest.id);
+    setTenantMaintenanceSuccess("Request submitted. Your landlord will be notified.");
+    setTenantMaintenanceDraft((prev) => ({ ...prev, title: "", description: "" }));
+
+    const stored = safeJsonParse(
+      window.localStorage.getItem(STORAGE_KEYS.maintenanceRequests),
+      []
+    );
+    const storedItem = {
+      ...newRequest,
+      propertyId,
+      tenantUsername: user?.username || "Tenant",
+      tenantId: user?.id || null,
+      createdAt: new Date().toISOString(),
+      type: "request",
+    };
+    window.localStorage.setItem(
+      STORAGE_KEYS.maintenanceRequests,
+      JSON.stringify([storedItem, ...stored])
+    );
+  };
+
+  const tenantMaintenanceStatusStyles = (status) => {
+    if (status === "Completed") return "bg-green-100 text-green-800 border border-green-200";
+    if (status === "In Progress") return "bg-blue-100 text-blue-800 border border-blue-200";
+    return "bg-yellow-100 text-yellow-800 border border-yellow-200";
+  };
+
+  const tenantMaintenanceInputBase =
+    "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
+
+  const upsertTenantProperty = (property) => {
+    if (!user?.username) return;
+    const all = loadArray(STORAGE_KEYS.tenantProperties);
+    const mine = all.filter((p) => p.tenantUsername === user.username);
+
+    const existsIndex = mine.findIndex((p) => p.id === property.id);
+    const nextMine =
+      existsIndex >= 0
+        ? mine.map((p) => (p.id === property.id ? property : p))
+        : [property, ...mine];
+
+    const nextAll = [...all.filter((p) => p.tenantUsername !== user.username), ...nextMine];
+    saveArray(STORAGE_KEYS.tenantProperties, nextAll);
+    setTenantRentalProperties(nextMine);
+
+    if (!selectedContactPropertyId) setSelectedContactPropertyId(nextMine[0]?.id ?? null);
+  };
+
+  const createRentAccount = (e) => {
+    e.preventDefault();
+    setRentSuccess("");
+    if (!user?.username) return;
+    if (!rentDraft.propertyLabel.trim()) return;
+    if (!rentDraft.monthlyRent || Number.isNaN(Number(rentDraft.monthlyRent))) return;
+
+    const propertyId = rentDraft.propertyId || `prop_${Date.now()}`;
+    const landlordName = rentDraft.landlordName.trim() || "Landlord";
+    const ownerUsername = rentDraft.ownerUsername.trim() || "owner";
+
+    const property = {
+      id: propertyId,
+      tenantUsername: user.username,
+      label: rentDraft.propertyLabel.trim(),
+      landlord: {
+        username: ownerUsername,
+        name: landlordName,
+        phone: "",
+        email: "",
+      },
+    };
+    upsertTenantProperty(property);
+
+    const allAccounts = loadArray(STORAGE_KEYS.rentAccounts);
+    const newAccount = {
+      id: `rent_${Date.now()}`,
+      tenantUsername: user.username,
+      propertyId,
+      propertyLabel: property.label,
+      ownerUsername,
+      landlordName,
+      monthlyRent: Number(rentDraft.monthlyRent),
+      dueDay: String(rentDraft.dueDay || "15"),
+      status: "Unpaid",
+      history: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    const nextAll = [newAccount, ...allAccounts];
+    saveArray(STORAGE_KEYS.rentAccounts, nextAll);
+    const mine = nextAll.filter((a) => a.tenantUsername === user.username);
+    setRentAccounts(mine);
+    setSelectedRentAccountId(newAccount.id);
+    setRentDraft((prev) => ({
+      ...prev,
+      propertyId: "",
+      propertyLabel: "",
+      landlordName: "",
+      ownerUsername: "",
+      monthlyRent: "",
+    }));
+    setRentSuccess("Rent item created.");
+  };
+
+  const payRentNow = (accountId) => {
+    setRentSuccess("");
+    if (!user?.username) return;
+
+    const allAccounts = loadArray(STORAGE_KEYS.rentAccounts);
+    const account = allAccounts.find((a) => a.id === accountId);
+    if (!account) return;
+
+    const payment = {
+      id: `pay_${Date.now()}`,
+      accountId,
+      amount: account.monthlyRent,
+      paidAt: new Date().toISOString(),
+      method: "Digital Wallet",
+    };
+
+    const nextAll = allAccounts.map((a) =>
+      a.id === accountId
+        ? { ...a, status: "Paid", lastPaidAt: payment.paidAt, history: [payment, ...(a.history || [])] }
+        : a
+    );
+    saveArray(STORAGE_KEYS.rentAccounts, nextAll);
+    setRentAccounts(nextAll.filter((a) => a.tenantUsername === user.username));
+    setRentSuccess("Payment recorded as Paid.");
+  };
+
+  const submitContactMessage = (e) => {
+    e.preventDefault();
+    setContactSuccess("");
+
+    if (!selectedContactPropertyId) return;
+    if (!contactDraft.message.trim()) return;
+
+    const selectedProperty =
+      tenantRentalProperties.find((p) => p.id === selectedContactPropertyId) ??
+      tenantRentalProperties[0] ??
+      null;
+
+    const stored = safeJsonParse(window.localStorage.getItem(STORAGE_KEYS.contactMessages), []);
+    const newMessage = {
+      id: Date.now(),
+      propertyId: selectedProperty?.id || "",
+      propertyLabel: selectedProperty?.label || "",
+      ownerUsername: selectedProperty?.landlord?.username || "",
+      ownerName: selectedProperty?.landlord?.name || "Landlord",
+      tenantUsername: user?.username || "Tenant",
+      subject: contactDraft.subject.trim(),
+      message: contactDraft.message.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    window.localStorage.setItem(STORAGE_KEYS.contactMessages, JSON.stringify([newMessage, ...stored]));
+    setContactDraft({ subject: "", message: "" });
+    setContactSuccess("Message sent.");
+  };
+
+  const getMaintenanceThreadKey = (item) =>
+    `${item.ownerUsername || ""}::${item.tenantUsername || ""}::${item.propertyId || item.propertyLabel || ""}`;
+
+  const reloadOwnerMaintenance = () => {
+    const stored = safeJsonParse(window.localStorage.getItem(STORAGE_KEYS.maintenanceRequests), []);
+    const mine =
+      userType === "owner" && user?.username
+        ? stored.filter((r) => r.ownerUsername === user.username)
+        : [];
+    setOwnerMaintenanceItems(mine);
+
+    if (!selectedOwnerThreadKey && mine.length > 0) {
+      setSelectedOwnerThreadKey(getMaintenanceThreadKey(mine[0]));
+    }
+  };
+
+  const updateMaintenanceStatus = (requestId, nextStatus) => {
+    const stored = safeJsonParse(window.localStorage.getItem(STORAGE_KEYS.maintenanceRequests), []);
+    const nextStored = stored.map((r) => (r.id === requestId ? { ...r, status: nextStatus } : r));
+    window.localStorage.setItem(STORAGE_KEYS.maintenanceRequests, JSON.stringify(nextStored));
+    reloadOwnerMaintenance();
+  };
+
+  const sendOwnerReply = (e) => {
+    e.preventDefault();
+    if (!selectedOwnerThreadKey) return;
+    if (!ownerReplyDraft.trim()) return;
+
+    const stored = safeJsonParse(window.localStorage.getItem(STORAGE_KEYS.maintenanceRequests), []);
+    const newMsg = {
+      id: Date.now(),
+      type: "owner_message",
+      ownerUsername: user?.username || "",
+      tenantUsername: selectedOwnerThreadKey.split("::")[1] || "",
+      propertyId: selectedOwnerThreadKey.split("::")[2] || "",
+      propertyLabel: "",
+      message: ownerReplyDraft.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    window.localStorage.setItem(STORAGE_KEYS.maintenanceRequests, JSON.stringify([newMsg, ...stored]));
+    setOwnerReplyDraft("");
+    reloadOwnerMaintenance();
+  };
 
   useEffect(() => {
     const stored = window.localStorage.getItem("rendUser");
@@ -160,6 +509,88 @@ const Dashboard = () => {
     });
     setProfileImagePreview(parsed.profileImage || null);
   }, [navigate]);
+
+  useEffect(() => {
+    if (!userType || !user?.username) return;
+
+    const storedMaintenance = loadArray(STORAGE_KEYS.maintenanceRequests);
+    const storedPropsAll = loadArray(STORAGE_KEYS.tenantProperties);
+    const storedAccountsAll = loadArray(STORAGE_KEYS.rentAccounts);
+
+    // Seed tenant properties for new users (demo data)
+    const seedTenantProps = () => [
+      {
+        id: "a101",
+        tenantUsername: user.username,
+        label: "Modern Apartment - Unit A-101",
+        landlord: {
+          username: "rajesh",
+          name: "Rajesh Kumar",
+          phone: "+977-987654321",
+          email: "rajesh.kumar@rent.com",
+        },
+      },
+      {
+        id: "b205",
+        tenantUsername: user.username,
+        label: "Studio Room - Unit B-205",
+        landlord: {
+          username: "suman",
+          name: "Suman Shrestha",
+          phone: "+977-981112223",
+          email: "suman.shrestha@rent.com",
+        },
+      },
+    ];
+
+    if (userType === "user") {
+      let mineProps = storedPropsAll.filter((p) => p.tenantUsername === user.username);
+      if (mineProps.length === 0) {
+        mineProps = seedTenantProps();
+        saveArray(STORAGE_KEYS.tenantProperties, [...storedPropsAll, ...mineProps]);
+      }
+      setTenantRentalProperties(mineProps);
+      if (!selectedContactPropertyId) setSelectedContactPropertyId(mineProps[0]?.id ?? null);
+
+      const mineMaintenance = storedMaintenance.filter(
+        (r) => r.tenantUsername === user.username && (r.type === "request" || !r.type)
+      );
+      if (mineMaintenance.length) {
+        setTenantMaintenanceRequests(mineMaintenance);
+        setSelectedTenantMaintenanceId(mineMaintenance[0]?.id ?? null);
+      }
+
+      let mineAccounts = storedAccountsAll.filter((a) => a.tenantUsername === user.username);
+      if (mineAccounts.length === 0) {
+        const seed = mineProps.map((p, idx) => ({
+          id: `rent_seed_${p.id}`,
+          tenantUsername: user.username,
+          propertyId: p.id,
+          propertyLabel: p.label,
+          ownerUsername: p.landlord.username,
+          landlordName: p.landlord.name,
+          monthlyRent: idx === 0 ? 25000 : 15000,
+          dueDay: "15",
+          status: "Unpaid",
+          history: [],
+          createdAt: new Date().toISOString(),
+        }));
+        saveArray(STORAGE_KEYS.rentAccounts, [...storedAccountsAll, ...seed]);
+        mineAccounts = seed;
+      }
+      setRentAccounts(mineAccounts);
+      if (!selectedRentAccountId) setSelectedRentAccountId(mineAccounts[0]?.id ?? null);
+
+      setTenantMaintenanceDraft((prev) => ({
+        ...prev,
+        propertyLabel: prev.propertyLabel || mineProps[0]?.label || "",
+      }));
+    }
+
+    if (userType === "owner" && user?.username) {
+      reloadOwnerMaintenance();
+    }
+  }, [userType, user?.username]);
 
   const handleLogout = () => {
     window.localStorage.removeItem("rendUser");
@@ -1841,7 +2272,7 @@ startxref
         <nav className="space-y-1 text-sm">
           {userType === "owner" ? 
             // Owner navigation - includes property management
-            ["home", "add-property", "manage-tenants", "view-listings", "financial-reports", "chat", "profile", "settings"].map((key) => (
+            ["home", "add-property", "manage-tenants", "requests", "view-listings", "financial-reports", "chat", "settings"].map((key) => (
               <button
                 key={key}
                 onClick={() => {
@@ -1858,17 +2289,17 @@ startxref
                   {key === "home" ? "Dashboard home" : 
                    key === "add-property" ? "Add Property" :
                    key === "manage-tenants" ? "Manage Tenants" :
+                   key === "requests" ? "Maintenance Requests" :
                    key === "view-listings" ? "View Listings" :
                    key === "financial-reports" ? "Financial Reports" :
                    key === "chat" ? "Chat" :
-                   key === "profile" ? "Profile" :
                    key === "settings" ? "Settings" : key}
                 </span>
               </button>
             ))
           :
             // User navigation - only tenant-relevant items
-            ["home", "view-listings", "pay-rent", "maintenance", "lease", "contact", "chat", "profile", "settings"].map((key) => (
+            ["home", "view-listings", "pay-rent", "maintenance", "lease", "contact", "chat", "settings"].map((key) => (
               <button
                 key={key}
                 onClick={() => {
@@ -1889,7 +2320,6 @@ startxref
                    key === "lease" ? "Agreements" :
                    key === "contact" ? "Contact Landlord" :
                    key === "chat" ? "Chat" :
-                   key === "profile" ? "Profile" :
                    key === "settings" ? "Settings" : key}
                 </span>
               </button>
@@ -1955,11 +2385,17 @@ startxref
                     </div>
                   </div>
                   
-                  <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setActive("requests")}
+                    className="rounded-xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 transition"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-slate-600">Pending Requests</p>
-                        <p className="text-2xl font-bold text-slate-900">3</p>
+                        <p className="text-sm text-slate-600">Maintenance Requests</p>
+                        <p className="text-2xl font-bold text-slate-900">
+                          {ownerMaintenanceItems.filter((r) => r.type === "request" && r.status !== "Completed").length}
+                        </p>
                       </div>
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1967,7 +2403,7 @@ startxref
                         </svg>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </div>
 
                 {/* Owner Specific Sections */}
@@ -2130,62 +2566,250 @@ startxref
           </div>
         )}
 
-        {active === "pay-rent" && (
-          <div className="max-w-4xl mx-auto p-6">
-            <div className="bg-white rounded-xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Pay Rent</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Month</h3>
-                  <div className="bg-blue-50 rounded-lg p-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-gray-600">March 2024 Rent</span>
-                      <span className="text-2xl font-bold text-blue-600">NPR 25,000</span>
-                    </div>
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-gray-600">Due Date</span>
-                      <span className="text-lg font-semibold text-orange-600">March 15, 2024</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Late Fee</span>
-                      <span className="text-lg font-semibold text-red-600">NPR 500/day</span>
-                    </div>
+        {active === "pay-rent" && userType === "user" && (
+          <div className="max-w-6xl mx-auto p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-900">Rent Items</h2>
+                    <p className="text-xs text-gray-500">Pay rent for multiple properties</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRentSuccess("");
+                      const firstProp = tenantRentalProperties[0];
+                      setRentDraft({
+                        propertyId: firstProp?.id || "",
+                        propertyLabel: firstProp?.label || "",
+                        ownerUsername: firstProp?.landlord?.username || "",
+                        landlordName: firstProp?.landlord?.name || "",
+                        monthlyRent: "",
+                        dueDay: "15",
+                      });
+                    }}
+                    className="rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    + Create New
+                  </button>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Method</h3>
-                  <div className="space-y-4">
-                    <div className="border rounded-lg p-4">
-                      <label className="flex items-center space-x-3 cursor-pointer">
-                        <input type="radio" name="payment" className="text-primary" />
-                        <span className="font-medium">Credit/Debit Card</span>
-                      </label>
-                    </div>
-                    <div className="border rounded-lg p-4">
-                      <label className="flex items-center space-x-3 cursor-pointer">
-                        <input type="radio" name="payment" className="text-primary" />
-                        <span className="font-medium">Bank Transfer</span>
-                      </label>
-                    </div>
-                    <div className="border rounded-lg p-4">
-                      <label className="flex items-center space-x-3 cursor-pointer">
-                        <input type="radio" name="payment" className="text-primary" />
-                        <span className="font-medium">Digital Wallet</span>
-                      </label>
-                    </div>
-                  </div>
+                <div className="p-2 space-y-2 max-h-[720px] overflow-auto">
+                  {rentAccounts.length === 0 ? (
+                    <div className="p-4 text-sm text-gray-600">No rent items yet.</div>
+                  ) : (
+                    rentAccounts.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setSelectedRentAccountId(a.id)}
+                        className={`w-full text-left rounded-2xl border p-3 transition ${
+                          selectedRentAccountId === a.id
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">{a.propertyLabel}</p>
+                            <p className="text-xs text-gray-500 truncate">{a.landlordName}</p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              a.status === "Paid"
+                                ? "bg-green-100 text-green-800 border border-green-200"
+                                : "bg-yellow-100 text-yellow-800 border border-yellow-200"
+                            }`}
+                          >
+                            {a.status}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
+                            NPR {Number(a.monthlyRent).toLocaleString()}
+                          </span>
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
+                            Due day {a.dueDay}
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 
-              <div className="mt-8 flex justify-end gap-4">
-                <button className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                  Cancel
-                </button>
-                <button className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 font-semibold">
-                  Pay NPR 25,000
-                </button>
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100">
+                  <h2 className="text-base font-semibold text-gray-900">Pay Rent</h2>
+                  <p className="text-xs text-gray-500">Select a rent item on the left or create a new one.</p>
+                </div>
+
+                <div className="p-5 space-y-5">
+                  {rentSuccess ? (
+                    <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                      {rentSuccess}
+                    </div>
+                  ) : null}
+
+                  {(() => {
+                    const selected = rentAccounts.find((a) => a.id === selectedRentAccountId) ?? null;
+
+                    if (!selected) {
+                      return (
+                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                          No rent item selected.
+                        </div>
+                      );
+                    }
+
+                    const lastPaid = selected.lastPaidAt ? new Date(selected.lastPaidAt).toLocaleString() : "Not paid yet";
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                          <p className="text-sm font-semibold text-gray-900">{selected.propertyLabel}</p>
+                          <p className="text-xs text-gray-500">{selected.landlordName}</p>
+                          <div className="mt-3 space-y-1 text-sm text-gray-700">
+                            <p>
+                              <span className="text-gray-500">Monthly:</span> NPR{" "}
+                              {Number(selected.monthlyRent).toLocaleString()}
+                            </p>
+                            <p>
+                              <span className="text-gray-500">Due day:</span> {selected.dueDay}
+                            </p>
+                            <p>
+                              <span className="text-gray-500">Last paid:</span> {lastPaid}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 p-4">
+                          <p className="text-sm font-semibold text-gray-900">Payment</p>
+                          <p className="mt-1 text-xs text-gray-500">This demo records payment as Paid.</p>
+                          <button
+                            type="button"
+                            onClick={() => payRentNow(selected.id)}
+                            className="mt-4 w-full rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          >
+                            Pay NPR {Number(selected.monthlyRent).toLocaleString()}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="border-t border-gray-100 pt-5">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Create Rent Item</h3>
+                    <form onSubmit={createRentAccount} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Use Existing Property</label>
+                          <select
+                            value={rentDraft.propertyId}
+                            onChange={(e) => {
+                              const prop = tenantRentalProperties.find((p) => p.id === e.target.value) ?? null;
+                              setRentDraft((prev) => ({
+                                ...prev,
+                                propertyId: e.target.value,
+                                propertyLabel: prop?.label || prev.propertyLabel,
+                                ownerUsername: prop?.landlord?.username || prev.ownerUsername,
+                                landlordName: prop?.landlord?.name || prev.landlordName,
+                              }));
+                            }}
+                            className={tenantMaintenanceInputBase}
+                          >
+                            <option value="">Select property (optional)</option>
+                            {tenantRentalProperties.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.label}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="mt-1 text-xs text-gray-500">Or type a new property below.</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Rent (NPR)</label>
+                          <input
+                            type="number"
+                            value={rentDraft.monthlyRent}
+                            onChange={(e) => setRentDraft((prev) => ({ ...prev, monthlyRent: e.target.value }))}
+                            className={tenantMaintenanceInputBase}
+                            placeholder="25000"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Property Name</label>
+                          <input
+                            type="text"
+                            value={rentDraft.propertyLabel}
+                            onChange={(e) => setRentDraft((prev) => ({ ...prev, propertyLabel: e.target.value }))}
+                            className={tenantMaintenanceInputBase}
+                            placeholder="Example: Room 1 - Unit C-301"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Due Day</label>
+                          <select
+                            value={rentDraft.dueDay}
+                            onChange={(e) => setRentDraft((prev) => ({ ...prev, dueDay: e.target.value }))}
+                            className={tenantMaintenanceInputBase}
+                          >
+                            {Array.from({ length: 28 }, (_, i) => String(i + 1)).map((d) => (
+                              <option key={d} value={d}>
+                                {d}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Landlord Name</label>
+                          <input
+                            type="text"
+                            value={rentDraft.landlordName}
+                            onChange={(e) => setRentDraft((prev) => ({ ...prev, landlordName: e.target.value }))}
+                            className={tenantMaintenanceInputBase}
+                            placeholder="Landlord"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Owner Username</label>
+                          <input
+                            type="text"
+                            value={rentDraft.ownerUsername}
+                            onChange={(e) => setRentDraft((prev) => ({ ...prev, ownerUsername: e.target.value }))}
+                            className={tenantMaintenanceInputBase}
+                            placeholder="rajesh"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setRentDraft({ propertyId: "", propertyLabel: "", ownerUsername: "", landlordName: "", monthlyRent: "", dueDay: "15" })}
+                          className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          type="submit"
+                          className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        >
+                          Create
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -2636,7 +3260,401 @@ startxref
           </div>
         )}
 
-        {active === "maintenance" && (
+        {active === "maintenance" && userType === "user" && (
+          <div className="max-w-6xl mx-auto p-6 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
+              {/* Requests list */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-900">Requests</h2>
+                    <p className="text-xs text-gray-500">Maintenance tickets for your rental</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openNewTenantMaintenanceRequest}
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    + New
+                  </button>
+                </div>
+
+                <div className="max-h-[520px] overflow-auto p-2">
+                  {tenantMaintenanceRequests.length === 0 ? (
+                    <div className="p-4 text-sm text-gray-600">No maintenance requests yet.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {tenantMaintenanceRequests.map((request) => (
+                        <button
+                          key={request.id}
+                          type="button"
+                          onClick={() => setSelectedTenantMaintenanceId(request.id)}
+                          className={`w-full text-left rounded-2xl border p-3 transition ${
+                            selectedTenantMaintenanceId === request.id
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-gray-200 bg-white hover:bg-gray-50"
+                          }`}
+                          aria-current={selectedTenantMaintenanceId === request.id ? "true" : "false"}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 truncate">{request.title}</p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {request.propertyLabel}{request.landlordName ? ` - ${request.landlordName}` : ""}
+                              </p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tenantMaintenanceStatusStyles(
+                                request.status
+                              )}`}
+                            >
+                              {request.status}
+                            </span>
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
+                              {request.category}
+                            </span>
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
+                              {request.priority}
+                            </span>
+                            <span className="ml-auto text-gray-500">{request.date}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Request form */}
+              <div ref={tenantMaintenanceFormRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                <div className="p-5 border-b border-gray-100">
+                  <h2 className="text-base font-semibold text-gray-900">Request Form</h2>
+                  <p className="text-xs text-gray-500">Create a new ticket for maintenance help.</p>
+                </div>
+
+                <form onSubmit={submitTenantMaintenanceRequest} className="p-5 space-y-5">
+                  {tenantMaintenanceSuccess ? (
+                    <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                      {tenantMaintenanceSuccess}
+                    </div>
+                  ) : null}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Property</label>
+                      <select
+                        value={tenantMaintenanceDraft.propertyLabel}
+                        onChange={(e) =>
+                          setTenantMaintenanceDraft((prev) => ({ ...prev, propertyLabel: e.target.value }))
+                        }
+                        className={tenantMaintenanceInputBase}
+                      >
+                        {tenantRentalProperties.map((p) => (
+                          <option key={p.id} value={p.label}>
+                            {p.label} (Landlord: {p.landlord.name})
+                          </option>
+                        ))}
+                      </select>
+                      {tenantMaintenanceErrors.propertyLabel ? (
+                        <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.propertyLabel}</p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Issue Type</label>
+                      <select
+                        value={tenantMaintenanceDraft.category}
+                        onChange={(e) =>
+                          setTenantMaintenanceDraft((prev) => ({ ...prev, category: e.target.value }))
+                        }
+                        className={tenantMaintenanceInputBase}
+                      >
+                        {["Plumbing", "Electrical", "HVAC", "Appliance", "Other"].map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                      <select
+                        value={tenantMaintenanceDraft.priority}
+                        onChange={(e) =>
+                          setTenantMaintenanceDraft((prev) => ({ ...prev, priority: e.target.value }))
+                        }
+                        className={tenantMaintenanceInputBase}
+                      >
+                        {["Emergency", "High", "Medium", "Low"].map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
+                      <input
+                        type="datetime-local"
+                        value={tenantMaintenanceDraft.preferredDateTime}
+                        onChange={(e) =>
+                          setTenantMaintenanceDraft((prev) => ({ ...prev, preferredDateTime: e.target.value }))
+                        }
+                        className={tenantMaintenanceInputBase}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={tenantMaintenanceDraft.title}
+                      onChange={(e) => setTenantMaintenanceDraft((prev) => ({ ...prev, title: e.target.value }))}
+                      className={tenantMaintenanceInputBase}
+                      placeholder="Short summary (e.g., Water leak under sink)"
+                    />
+                    {tenantMaintenanceErrors.title ? (
+                      <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.title}</p>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      rows="5"
+                      value={tenantMaintenanceDraft.description}
+                      onChange={(e) =>
+                        setTenantMaintenanceDraft((prev) => ({ ...prev, description: e.target.value }))
+                      }
+                      placeholder="Please describe the maintenance issue in detail..."
+                      className={`${tenantMaintenanceInputBase} min-h-[140px] resize-y`}
+                    />
+                    {tenantMaintenanceErrors.description ? (
+                      <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.description}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActive('home')}
+                      className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      Submit Request
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              Need to message your landlord? Open <span className="font-semibold">Contact Landlord</span> from the sidebar.
+            </div>
+
+            <div className="hidden">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Landlord</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Landlord Information</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-16 h-16 bg-gray-200 rounded-full"></div>
+                      <div>
+                        <p className="font-medium text-lg">Rajesh Kumar</p>
+                        <p className="text-sm text-gray-600">Property Owner</p>
+                        <p className="text-sm text-green-600">• Online</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">Phone:</span>
+                        <span className="text-sm">+977-987654321</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">Email:</span>
+                        <span className="text-sm">rajesh.kumar@rent.com</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Send Message</h3>
+                  <form className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                      <input
+                        type="text"
+                        placeholder="Enter subject..."
+                        className={tenantMaintenanceInputBase}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                      <textarea
+                        rows="4"
+                        placeholder="Type your message here..."
+                        className={`${tenantMaintenanceInputBase} resize-y`}
+                      ></textarea>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setActive('home')}
+                        className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        Send Message
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {active === "contact" && userType === "user" && (
+          <div className="max-w-6xl mx-auto p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100">
+                  <h2 className="text-base font-semibold text-gray-900">Landlords</h2>
+                  <p className="text-xs text-gray-500">Pick a property to contact its landlord</p>
+                </div>
+
+                <div className="p-2 space-y-2">
+                  {tenantRentalProperties.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedContactPropertyId(p.id);
+                        setContactSuccess("");
+                      }}
+                      className={`w-full text-left rounded-2xl border p-3 transition ${
+                        selectedContactPropertyId === p.id
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold text-gray-900 truncate">{p.label}</p>
+                      <p className="text-xs text-gray-500 truncate">{p.landlord.name}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100">
+                  <h2 className="text-base font-semibold text-gray-900">Contact Landlord</h2>
+                  <p className="text-xs text-gray-500">Send a message to your landlord for the selected property.</p>
+                </div>
+
+                <div className="p-5 space-y-5">
+                  {(() => {
+                    const selected =
+                      tenantRentalProperties.find((p) => p.id === selectedContactPropertyId) ??
+                      tenantRentalProperties[0] ??
+                      null;
+
+                    if (!selected) {
+                      return <p className="text-sm text-gray-600">No properties available.</p>;
+                    }
+
+                    return (
+                      <>
+                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                          <p className="text-sm font-semibold text-gray-900">{selected.label}</p>
+                          <div className="mt-2 text-sm text-gray-700 space-y-1">
+                            <p>
+                              <span className="text-gray-500">Landlord:</span> {selected.landlord.name}
+                            </p>
+                            <p>
+                              <span className="text-gray-500">Phone:</span> {selected.landlord.phone}
+                            </p>
+                            <p>
+                              <span className="text-gray-500">Email:</span> {selected.landlord.email}
+                            </p>
+                          </div>
+                        </div>
+
+                        <form onSubmit={submitContactMessage} className="space-y-4">
+                          {contactSuccess ? (
+                            <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                              {contactSuccess}
+                            </div>
+                          ) : null}
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                            <input
+                              type="text"
+                              value={contactDraft.subject}
+                              onChange={(e) => setContactDraft((prev) => ({ ...prev, subject: e.target.value }))}
+                              placeholder="Enter subject..."
+                              className={tenantMaintenanceInputBase}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                            <textarea
+                              rows="5"
+                              value={contactDraft.message}
+                              onChange={(e) => setContactDraft((prev) => ({ ...prev, message: e.target.value }))}
+                              placeholder="Type your message here..."
+                              className={`${tenantMaintenanceInputBase} resize-y`}
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                              For maintenance problems, use <span className="font-semibold">Request Maintenance</span>.
+                            </p>
+                          </div>
+
+                          <div className="flex justify-end gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setActive("home")}
+                              className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            >
+                              Send Message
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {active === "maintenance_legacy" && (
           <div className="max-w-4xl mx-auto p-6">
             <div className="bg-white rounded-xl shadow-lg p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Request Maintenance</h2>
@@ -3120,7 +4138,7 @@ startxref
           </div>
         )}
 
-        {active === "profile" && (
+        {active === "profile_legacy" && (
           <div className="max-w-2xl mx-auto p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Edit Profile</h2>
 
@@ -3243,6 +4261,7 @@ startxref
                   { name: 'Account', icon: '👤' },
                   { name: 'Security', icon: '🔒' },
                   { name: 'Notifications', icon: '🔔' },
+                  { name: 'Privacy', icon: '🛡️' },
                   { name: 'Billing', icon: '💳' },
                   { name: 'Integrations', icon: '⚙️' },
                 ].map((item) => (
@@ -3265,86 +4284,7 @@ startxref
             {/* --- Main Content --- */}
             <main className="flex-1 p-8">
               <div className="max-w-4xl mx-auto">
-                <h1 className="text-2xl font-bold text-gray-900 mb-8">Account Settings</h1>
-
-                {/* Section: Account */}
-                <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Username</label>
-                      <input 
-                        type="text" 
-                        value={profileForm.username}
-                        onChange={(e) => setProfileForm(prev => ({ ...prev, username: e.target.value }))}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-primary outline-none" 
-                        placeholder="username" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Primary Email</label>
-                      <input 
-                        type="email" 
-                        value={profileForm.email}
-                        onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-md px-4 py-2 text-sm focus:ring-2 focus:ring-primary outline-none" 
-                        placeholder="email@example.com" 
-                      />
-                    </div>
-                  </div>
-                </section>
-
-                {/* Section: Personal Info */}
-                <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
-                  <h3 className="text-md font-bold text-gray-800 mb-6">Personal Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2">First Name</label>
-                      <input 
-                        type="text" 
-                        value={profileForm.fullName?.split(' ')[0] || ''}
-                        onChange={(e) => {
-                          const lastName = profileForm.fullName?.split(' ').slice(1).join(' ') || '';
-                          setProfileForm(prev => ({ ...prev, fullName: `${e.target.value} ${lastName}`.trim() }));
-                        }}
-                        className="w-full border border-gray-200 rounded-md px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-primary" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Last Name</label>
-                      <input 
-                        type="text" 
-                        value={profileForm.fullName?.split(' ').slice(1).join(' ') || ''}
-                        onChange={(e) => {
-                          const firstName = profileForm.fullName?.split(' ')[0] || '';
-                          setProfileForm(prev => ({ ...prev, fullName: `${firstName} ${e.target.value}`.trim() }));
-                        }}
-                        className="w-full border border-gray-200 rounded-md px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-primary" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Location</label>
-                      <input 
-                        type="text" 
-                        placeholder="City, Country"
-                        className="w-full border border-gray-200 rounded-md px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-primary" 
-                      />
-                    </div>
-                  </div>
-                </section>
-
-                {/* Section: Visibility (Toggle) */}
-                <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-md font-bold text-gray-800">Profile Visibility</h3>
-                    <p className="text-sm text-gray-500">Manage who can see your profile and activity</p>
-                  </div>
-                  <button 
-                    onClick={() => setIsPublic(!isPublic)}
-                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${isPublic ? 'bg-primary' : 'bg-gray-300'}`}
-                  >
-                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${isPublic ? 'translate-x-6' : 'translate-x-0'}`} />
-                  </button>
-                </section>
+                <h1 className="text-2xl font-bold text-gray-900 mb-8">{settingsActiveTab} Settings</h1>
 
                 {/* Additional Settings Sections based on active tab */}
                 {settingsActiveTab === 'Security' && (
@@ -3413,10 +4353,10 @@ startxref
                           <p className="text-sm text-gray-500">Receive rent payment due date reminders</p>
                         </div>
                         <button 
-                          onClick={() => setPropertyUpdates(!propertyUpdates)}
-                          className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${propertyUpdates ? 'bg-primary' : 'bg-gray-300'}`}
+                          onClick={() => setPaymentReminders(!paymentReminders)}
+                          className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${paymentReminders ? 'bg-primary' : 'bg-gray-300'}`}
                         >
-                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${propertyUpdates ? 'translate-x-6' : 'translate-x-0'}`} />
+                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${paymentReminders ? 'translate-x-6' : 'translate-x-0'}`} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between">
@@ -3424,8 +4364,11 @@ startxref
                           <p className="font-medium text-gray-700">Marketing Communications</p>
                           <p className="text-sm text-gray-500">Receive promotional offers and newsletters</p>
                         </div>
-                        <button className="w-12 h-6 rounded-full p-1 bg-gray-300 transition-colors duration-300">
-                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300" />
+                        <button
+                          onClick={() => setMarketingCommunications(!marketingCommunications)}
+                          className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${marketingCommunications ? 'bg-primary' : 'bg-gray-300'}`}
+                        >
+                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${marketingCommunications ? 'translate-x-6' : 'translate-x-0'}`} />
                         </button>
                       </div>
                     </div>
@@ -3434,37 +4377,102 @@ startxref
 
                 {settingsActiveTab === 'Account' && (
                   <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
-                    <h3 className="text-md font-bold text-gray-800 mb-4">Account Information</h3>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Account Type</label>
-                          <select className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50">
-                            <option>Property Owner</option>
-                            <option>Tenant</option>
-                            <option>Agent</option>
-                          </select>
+                    <h3 className="text-md font-bold text-gray-800 mb-4">Profile</h3>
+
+                    <div className="flex flex-col items-center mb-8">
+                      <div className="relative group">
+                        <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-primary/20 bg-gray-100 flex items-center justify-center">
+                          {profileImagePreview ? (
+                            <img src={profileImagePreview} alt="Profile" className="w-full h-full object-cover" />
+                          ) : (
+                            <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          )}
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Member Since</label>
-                          <input type="text" value="March 2024" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" />
-                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleCameraClick}
+                          className="absolute bottom-0 right-0 bg-primary p-2 rounded-full text-white hover:bg-primary/90 transition-colors shadow-lg"
+                          title="Upload Photo"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </button>
+
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleImageChange}
+                          accept="image/*"
+                          className="hidden"
+                        />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                          <input type="tel" placeholder="+977-98xxxxxxxx" className="w-full p-2 border border-gray-300 rounded-lg" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
-                          <input type="date" className="w-full p-2 border border-gray-300 rounded-lg" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                        <textarea rows="3" placeholder="Your complete address" className="w-full p-2 border border-gray-300 rounded-lg"></textarea>
-                      </div>
+                      <p className="mt-2 text-sm text-gray-500">Update profile photo</p>
                     </div>
+
+                    <form onSubmit={handleProfileSave} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                          <input
+                            type="text"
+                            value={profileForm.username}
+                            onChange={(e) => setProfileForm((prev) => ({ ...prev, username: e.target.value }))}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                          <input
+                            type="text"
+                            value={profileForm.fullName}
+                            onChange={(e) => setProfileForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                          <input
+                            type="email"
+                            value={profileForm.email}
+                            onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                        <textarea
+                          rows="3"
+                          value={profileForm.bio}
+                          onChange={(e) => setProfileForm((prev) => ({ ...prev, bio: e.target.value }))}
+                          placeholder="Tell us about yourself..."
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActive("home")}
+                          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 shadow-md transition disabled:opacity-70"
+                        >
+                          {saving ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    </form>
                   </section>
                 )}
 
@@ -3477,8 +4485,11 @@ startxref
                           <p className="font-medium text-gray-700">Profile Visibility</p>
                           <p className="text-sm text-gray-500">Make your profile visible to other users</p>
                         </div>
-                        <button className="w-12 h-6 rounded-full p-1 bg-primary transition-colors duration-300">
-                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 translate-x-6" />
+                        <button
+                          onClick={() => setIsPublic(!isPublic)}
+                          className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${isPublic ? 'bg-primary' : 'bg-gray-300'}`}
+                        >
+                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${isPublic ? 'translate-x-6' : 'translate-x-0'}`} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between">
@@ -3486,8 +4497,11 @@ startxref
                           <p className="font-medium text-gray-700">Show Contact Information</p>
                           <p className="text-sm text-gray-500">Display your email and phone to property owners</p>
                         </div>
-                        <button className="w-12 h-6 rounded-full p-1 bg-gray-300 transition-colors duration-300">
-                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300" />
+                        <button
+                          onClick={() => setShowContactInfo(!showContactInfo)}
+                          className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${showContactInfo ? 'bg-primary' : 'bg-gray-300'}`}
+                        >
+                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${showContactInfo ? 'translate-x-6' : 'translate-x-0'}`} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between">
@@ -3495,11 +4509,21 @@ startxref
                           <p className="font-medium text-gray-700">Data Sharing</p>
                           <p className="text-sm text-gray-500">Share anonymous usage data to improve our services</p>
                         </div>
-                        <button className="w-12 h-6 rounded-full p-1 bg-gray-300 transition-colors duration-300">
-                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300" />
+                        <button
+                          onClick={() => setDataSharing(!dataSharing)}
+                          className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${dataSharing ? 'bg-primary' : 'bg-gray-300'}`}
+                        >
+                          <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${dataSharing ? 'translate-x-6' : 'translate-x-0'}`} />
                         </button>
                       </div>
                     </div>
+                  </section>
+                )}
+
+                {settingsActiveTab === 'Integrations' && (
+                  <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+                    <h3 className="text-md font-bold text-gray-800 mb-4">Integrations</h3>
+                    <p className="text-sm text-gray-600">Connect payment gateways and service providers (coming soon).</p>
                   </section>
                 )}
 
@@ -3541,22 +4565,24 @@ startxref
 
                 {/* Footer Actions */}
                 <div className="flex justify-between items-center mt-10">
-                  <button
-                    onClick={handleLogout}
-                    className="px-6 py-2 text-sm font-bold text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50"
-                  >
-                    Logout
-                  </button>
-                  <div className="flex gap-4">
-                    <button className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-700">Cancel</button>
-                    <button 
-                      onClick={handleProfileSave}
-                      disabled={saving}
-                      className="px-8 py-2 bg-primary hover:bg-primary/90 text-white font-bold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-70"
+                  {settingsActiveTab === "Account" ? (
+                    <button
+                      onClick={handleLogout}
+                      className="px-6 py-2 text-sm font-bold text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50"
                     >
-                      {saving ? "Saving..." : "Save Changes"}
+                      Logout
                     </button>
-                  </div>
+                  ) : (
+                    <div />
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setActive("home")}
+                    className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-700"
+                  >
+                    Back
+                  </button>
                 </div>
               </div>
             </main>
@@ -3768,6 +4794,219 @@ startxref
           </div>
         )}
         
+        {userType === "owner" && active === "requests" && (
+          <div className="p-6">
+            <div className="max-w-6xl mx-auto">
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Maintenance Requests</h1>
+                  <p className="text-sm text-gray-600">View requests from all tenants (chat-style)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    reloadOwnerMaintenance();
+                    setActive("home");
+                  }}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Back
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <p className="text-sm text-gray-600">Total Requests</p>
+                  <p className="mt-1 text-2xl font-bold text-gray-900">
+                    {ownerMaintenanceItems.filter((r) => r.type === "request").length}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 shadow-sm">
+                  <p className="text-sm text-yellow-800">Pending Requests</p>
+                  <p className="mt-1 text-2xl font-bold text-yellow-900">
+                    {ownerMaintenanceItems.filter(
+                      (r) => r.type === "request" && r.status !== "Completed"
+                    ).length}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-green-200 bg-green-50 p-4 shadow-sm">
+                  <p className="text-sm text-green-800">Done Requests</p>
+                  <p className="mt-1 text-2xl font-bold text-green-900">
+                    {ownerMaintenanceItems.filter(
+                      (r) => r.type === "request" && r.status === "Completed"
+                    ).length}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-semibold text-gray-900">Tenants</h2>
+                      <p className="text-xs text-gray-500">Select a tenant to view requests</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={reloadOwnerMaintenance}
+                      className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {(() => {
+                    const threads = new Map();
+                    for (const item of ownerMaintenanceItems) {
+                      const key = getMaintenanceThreadKey(item);
+                      const prev = threads.get(key);
+                      if (!prev) {
+                        threads.set(key, { key, latest: item });
+                      } else {
+                        const prevTime = new Date(prev.latest.createdAt || 0).getTime();
+                        const nextTime = new Date(item.createdAt || 0).getTime();
+                        if (nextTime > prevTime) threads.set(key, { key, latest: item });
+                      }
+                    }
+
+                    const threadList = Array.from(threads.values()).sort((a, b) => {
+                      const at = new Date(a.latest.createdAt || 0).getTime();
+                      const bt = new Date(b.latest.createdAt || 0).getTime();
+                      return bt - at;
+                    });
+
+                    if (threadList.length === 0) {
+                      return <div className="p-4 text-sm text-gray-600">No requests yet.</div>;
+                    }
+
+                    return (
+                      <div className="p-2 space-y-2 max-h-[640px] overflow-auto">
+                        {threadList.map((t) => {
+                          const tenantUsername = t.latest.tenantUsername || "Tenant";
+                          const propertyLabel = t.latest.propertyLabel || "Property";
+                          const isActive = selectedOwnerThreadKey === t.key;
+                          return (
+                            <button
+                              key={t.key}
+                              type="button"
+                              onClick={() => setSelectedOwnerThreadKey(t.key)}
+                              className={`w-full text-left rounded-2xl border p-3 transition ${
+                                isActive
+                                  ? "border-primary bg-primary/5 shadow-sm"
+                                  : "border-gray-200 bg-white hover:bg-gray-50"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-gray-900 truncate">{tenantUsername}</p>
+                                  <p className="text-xs text-gray-500 truncate">{propertyLabel}</p>
+                                </div>
+                                <span className="text-[11px] font-semibold text-gray-500">
+                                  {t.latest.date || ""}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs text-gray-600 truncate">
+                                {t.latest.type === "owner_message" ? t.latest.message : t.latest.title || t.latest.description}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-5 border-b border-gray-100">
+                    <h2 className="text-base font-semibold text-gray-900">Conversation</h2>
+                    <p className="text-xs text-gray-500">Requests and replies</p>
+                  </div>
+
+                  {(() => {
+                    if (!selectedOwnerThreadKey) {
+                      return <div className="p-5 text-sm text-gray-600">Select a tenant thread.</div>;
+                    }
+
+                    const messages = ownerMaintenanceItems
+                      .filter((i) => getMaintenanceThreadKey(i) === selectedOwnerThreadKey)
+                      .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+
+                    if (messages.length === 0) {
+                      return <div className="p-5 text-sm text-gray-600">No messages.</div>;
+                    }
+
+                    return (
+                      <div className="flex flex-col h-[640px]">
+                        <div className="flex-1 overflow-auto p-5 space-y-3 bg-gray-50">
+                          {messages.map((m) => (
+                            <div key={m.id} className="space-y-2">
+                              {m.type === "owner_message" ? (
+                                <div className="flex justify-end">
+                                  <div className="max-w-[80%] rounded-2xl bg-primary text-white px-4 py-3 text-sm shadow-sm">
+                                    <p className="whitespace-pre-wrap">{m.message}</p>
+                                    <p className="mt-1 text-[11px] text-white/80">{new Date(m.createdAt).toLocaleString()}</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex justify-start">
+                                  <div className="max-w-[80%] rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-gray-900">{m.title}</p>
+                                        <p className="text-xs text-gray-500">{m.propertyLabel}</p>
+                                      </div>
+                                      <select
+                                        value={m.status || "Open"}
+                                        onChange={(e) => updateMaintenanceStatus(m.id, e.target.value)}
+                                        className="text-xs rounded-lg border border-gray-200 bg-white px-2 py-1"
+                                      >
+                                        {["Open", "In Progress", "Completed"].map((s) => (
+                                          <option key={s} value={s}>
+                                            {s}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-700">
+                                      <span className="rounded-full bg-gray-100 px-2 py-0.5">{m.category}</span>
+                                      <span className="rounded-full bg-gray-100 px-2 py-0.5">{m.priority}</span>
+                                      <span className="ml-auto text-gray-500">{m.date}</span>
+                                    </div>
+                                    <p className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{m.description}</p>
+                                    <p className="mt-2 text-[11px] text-gray-500">{new Date(m.createdAt).toLocaleString()}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="border-t border-gray-200 p-4 bg-white">
+                          <form onSubmit={sendOwnerReply} className="flex gap-2">
+                            <input
+                              type="text"
+                              value={ownerReplyDraft}
+                              onChange={(e) => setOwnerReplyDraft(e.target.value)}
+                              placeholder="Reply to tenant..."
+                              className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            >
+                              Send
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {active === "add-property" && (
           <div className="flex h-screen bg-gray-100 font-sans">
             {/* Add Property Form takes full right side */}

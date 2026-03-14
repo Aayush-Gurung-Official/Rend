@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const UserDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const maintenanceFormRef = useRef(null);
   
   // Sample user data
   const [userProfile, setUserProfile] = useState({
@@ -40,23 +41,106 @@ const UserDashboard = () => {
   ]);
 
   const [maintenanceRequests, setMaintenanceRequests] = useState([
-    { id: 1, type: 'Plumbing', status: 'Pending', date: '2024-03-10', description: 'Leaking kitchen faucet' },
-    { id: 2, type: 'Electrical', status: 'Completed', date: '2024-03-05', description: 'Light bulb replacement' }
+    {
+      id: 1,
+      title: 'Leaking kitchen faucet',
+      category: 'Plumbing',
+      priority: 'Medium',
+      status: 'Pending',
+      date: '2024-03-10',
+      description: 'Leaking kitchen faucet under the sink. Water is pooling in the cabinet.'
+    },
+    {
+      id: 2,
+      title: 'Light flickering in living room',
+      category: 'Electrical',
+      priority: 'Low',
+      status: 'Completed',
+      date: '2024-03-05',
+      description: 'Living room ceiling light flickers intermittently. Please check wiring or switch.'
+    }
   ]);
+
+  const [selectedRequestId, setSelectedRequestId] = useState(maintenanceRequests[0]?.id ?? null);
+  const [requestDraft, setRequestDraft] = useState({
+    propertyId: String(myProperties[0]?.id ?? ''),
+    title: '',
+    category: 'Plumbing',
+    priority: 'Medium',
+    description: '',
+    preferredDate: '',
+    preferredTime: 'Anytime',
+    canEnter: false,
+    contactPhone: userProfile.phone || ''
+  });
+  const [requestErrors, setRequestErrors] = useState({});
+  const [requestSuccess, setRequestSuccess] = useState('');
 
   const handlePayRent = () => {
     alert('Redirecting to payment gateway...');
   };
 
   const handleNewRequest = () => {
-    alert('Opening maintenance request form...');
+    setRequestSuccess('');
+    setRequestErrors({});
+    setSelectedRequestId(null);
+    setRequestDraft({
+      propertyId: String(myProperties[0]?.id ?? ''),
+      title: '',
+      category: 'Plumbing',
+      priority: 'Medium',
+      description: '',
+      preferredDate: '',
+      preferredTime: 'Anytime',
+      canEnter: false,
+      contactPhone: userProfile.phone || ''
+    });
+
+    requestAnimationFrame(() => {
+      maintenanceFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const handleSubmitMaintenance = (e) => {
+    e.preventDefault();
+    setRequestSuccess('');
+
+    const nextErrors = {};
+    if (!requestDraft.propertyId) nextErrors.propertyId = 'Please select a property.';
+    if (!requestDraft.title.trim()) nextErrors.title = 'Please enter a short title.';
+    if (!requestDraft.description.trim()) nextErrors.description = 'Please describe the issue.';
+    if (!requestDraft.contactPhone.trim()) nextErrors.contactPhone = 'Please add a phone number.';
+
+    setRequestErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+
+    const newRequest = {
+      id: Date.now(),
+      title: requestDraft.title.trim(),
+      category: requestDraft.category,
+      priority: requestDraft.priority,
+      status: 'Pending',
+      date: `${yyyy}-${mm}-${dd}`,
+      description: requestDraft.description.trim(),
+      propertyId: Number(requestDraft.propertyId)
+    };
+
+    setMaintenanceRequests((prev) => [newRequest, ...prev]);
+    setSelectedRequestId(newRequest.id);
+    setRequestSuccess('Request submitted. Our team will contact you shortly.');
+    setRequestDraft((prev) => ({ ...prev, title: '', description: '' }));
   };
 
   const renderOverview = () => (
     <div className="space-y-6">
       {/* Rent Payment Card */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
-        <h2 className="text-xl font-bold mb-4">💳 Rent Payment</h2>
+        <h2 className="text-xl font-bold mb-4">Rent Payment</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white/20 backdrop-blur rounded-lg p-4">
             <p className="text-blue-100 text-sm">Current Rent</p>
@@ -98,8 +182,8 @@ const UserDashboard = () => {
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
           <h3 className="font-semibold text-gray-800 mb-2">Maintenance</h3>
-          <p className="text-2xl font-bold text-yellow-600">{maintenanceRequests.filter(r => r.status === 'Pending').length}</p>
-          <p className="text-sm text-gray-500">Pending requests</p>
+          <p className="text-2xl font-bold text-yellow-600">{maintenanceRequests.filter(r => r.status !== 'Completed').length}</p>
+          <p className="text-sm text-gray-500">Open requests</p>
         </div>
       </div>
     </div>
@@ -114,7 +198,7 @@ const UserDashboard = () => {
             <div className="h-32 bg-gray-200 rounded-lg mb-4"></div>
             <h3 className="font-semibold text-gray-900">{property.name}</h3>
             <p className="text-sm text-gray-600">{property.address}</p>
-            <p className="text-sm text-gray-500">{property.beds} beds • {property.baths} baths • {property.sqft} sqft</p>
+            <p className="text-sm text-gray-500">{property.beds} beds - {property.baths} baths - {property.sqft} sqft</p>
             <p className="text-lg font-bold text-primary">{property.rent}</p>
             <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
               {property.status}
@@ -125,53 +209,277 @@ const UserDashboard = () => {
     </div>
   );
 
-  const renderMaintenance = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-gray-900">Maintenance Requests</h2>
-        <button 
-          onClick={handleNewRequest}
-          className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          + New Request
-        </button>
+  const renderMaintenance = () => {
+    const selectedRequest = selectedRequestId
+      ? maintenanceRequests.find((r) => r.id === selectedRequestId)
+      : null;
+
+    const statusStyles = (status) => {
+      if (status === 'Completed') return 'bg-green-100 text-green-800 border border-green-200';
+      if (status === 'In Progress') return 'bg-blue-100 text-blue-800 border border-blue-200';
+      return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+    };
+
+    const inputBase =
+      'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20';
+
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Requests</h2>
+              <p className="text-xs text-gray-500">Track your maintenance tickets</p>
+            </div>
+            <button
+              onClick={handleNewRequest}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              + New
+            </button>
+          </div>
+
+          <div className="max-h-[520px] overflow-auto p-2">
+            {maintenanceRequests.length === 0 ? (
+              <div className="p-4 text-sm text-gray-600">No maintenance requests yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {maintenanceRequests.map((request) => (
+                  <button
+                    key={request.id}
+                    type="button"
+                    onClick={() => setSelectedRequestId(request.id)}
+                    className={`w-full text-left rounded-2xl border p-3 transition ${
+                      selectedRequestId === request.id
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }`}
+                    aria-current={selectedRequestId === request.id ? 'true' : 'false'}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{request.title}</p>
+                        <p className="text-xs text-gray-500 truncate">{request.description}</p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusStyles(
+                          request.status
+                        )}`}
+                      >
+                        {request.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
+                        {request.category}
+                      </span>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
+                        {request.priority}
+                      </span>
+                      <span className="ml-auto text-gray-500">{request.date}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div ref={maintenanceFormRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+          <div className="p-5 border-b border-gray-100 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Request Form</h2>
+              <p className="text-xs text-gray-500">
+                Submit a new maintenance request. Select a request on the left to view details.
+              </p>
+            </div>
+            {selectedRequest ? (
+              <div className="hidden sm:block text-right">
+                <p className="text-xs text-gray-500">Selected</p>
+                <p className="text-sm font-semibold text-gray-900 truncate max-w-[240px]">{selectedRequest.title}</p>
+              </div>
+            ) : null}
+          </div>
+
+          <form onSubmit={handleSubmitMaintenance} className="p-5 space-y-5">
+            {requestSuccess ? (
+              <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                {requestSuccess}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Property</label>
+                <select
+                  value={requestDraft.propertyId}
+                  onChange={(e) =>
+                    setRequestDraft((prev) => ({ ...prev, propertyId: e.target.value }))
+                  }
+                  className={inputBase}
+                >
+                  {myProperties.map((p) => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.name} - {p.address}
+                    </option>
+                  ))}
+                </select>
+                {requestErrors.propertyId ? (
+                  <p className="mt-1 text-xs text-red-600">{requestErrors.propertyId}</p>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  value={requestDraft.category}
+                  onChange={(e) => setRequestDraft((prev) => ({ ...prev, category: e.target.value }))}
+                  className={inputBase}
+                >
+                  {[
+                    'Plumbing',
+                    'Electrical',
+                    'HVAC',
+                    'Appliance',
+                    'Pest Control',
+                    'Structural',
+                    'Landscaping',
+                    'Security',
+                    'Cleaning',
+                    'Other'
+                  ].map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select
+                  value={requestDraft.priority}
+                  onChange={(e) => setRequestDraft((prev) => ({ ...prev, priority: e.target.value }))}
+                  className={inputBase}
+                >
+                  {['Low', 'Medium', 'High', 'Urgent'].map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+                <input
+                  type="tel"
+                  value={requestDraft.contactPhone}
+                  onChange={(e) =>
+                    setRequestDraft((prev) => ({ ...prev, contactPhone: e.target.value }))
+                  }
+                  className={inputBase}
+                  placeholder="+977-98XXXXXXXX"
+                />
+                {requestErrors.contactPhone ? (
+                  <p className="mt-1 text-xs text-red-600">{requestErrors.contactPhone}</p>
+                ) : null}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <input
+                type="text"
+                value={requestDraft.title}
+                onChange={(e) => setRequestDraft((prev) => ({ ...prev, title: e.target.value }))}
+                className={inputBase}
+                placeholder="Short summary (e.g., Water leak under sink)"
+              />
+              {requestErrors.title ? <p className="mt-1 text-xs text-red-600">{requestErrors.title}</p> : null}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={requestDraft.description}
+                onChange={(e) =>
+                  setRequestDraft((prev) => ({ ...prev, description: e.target.value }))
+                }
+                className={`${inputBase} min-h-[140px] resize-y`}
+                placeholder="Describe what happened, where, and when it started..."
+              />
+              {requestErrors.description ? (
+                <p className="mt-1 text-xs text-red-600">{requestErrors.description}</p>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
+                <input
+                  type="date"
+                  value={requestDraft.preferredDate}
+                  onChange={(e) =>
+                    setRequestDraft((prev) => ({ ...prev, preferredDate: e.target.value }))
+                  }
+                  className={inputBase}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time</label>
+                <select
+                  value={requestDraft.preferredTime}
+                  onChange={(e) =>
+                    setRequestDraft((prev) => ({ ...prev, preferredTime: e.target.value }))
+                  }
+                  className={inputBase}
+                >
+                  {['Anytime', 'Morning (9-12)', 'Afternoon (12-4)', 'Evening (4-7)'].map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <input
+                id="canEnter"
+                type="checkbox"
+                checked={requestDraft.canEnter}
+                onChange={(e) =>
+                  setRequestDraft((prev) => ({ ...prev, canEnter: e.target.checked }))
+                }
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <label htmlFor="canEnter" className="text-sm text-gray-700">
+                Maintenance staff can enter the unit if I am not home (optional).
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleNewRequest}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Reset
+              </button>
+              <button
+                type="submit"
+                className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                Submit Request
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {maintenanceRequests.map((request) => (
-              <tr key={request.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded-full">
-                    {request.type}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900">{request.description}</td>
-                <td className="px-6 py-4 text-sm text-gray-900">{request.date}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    request.status === 'Completed' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {request.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderProfile = () => (
     <div className="space-y-6">
@@ -221,44 +529,63 @@ const UserDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="mb-8">
           <button
             onClick={() => navigate('/')}
             className="mb-4 text-primary hover:text-primary/80 font-medium"
           >
-            ← Back to Home
+            &larr; Back to Home
           </button>
           <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
           <p className="text-gray-600">Manage your rental experience and payments</p>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-xl shadow-sm mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
-              {['overview', 'properties', 'maintenance', 'profile'].map((tab) => (
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+          {/* Dashboard Nav */}
+          <aside className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-fit lg:sticky lg:top-6">
+            <div className="p-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  {userProfile.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{userProfile.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{userProfile.email}</p>
+                </div>
+              </div>
+            </div>
+
+            <nav className="p-2">
+              {[
+                { key: 'overview', label: 'Overview' },
+                { key: 'properties', label: 'My Properties' },
+                { key: 'maintenance', label: 'Request Maintenance' },
+                { key: 'profile', label: 'Profile' }
+              ].map((item) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    activeTab === tab
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  key={item.key}
+                  onClick={() => setActiveTab(item.key)}
+                  className={`w-full text-left rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    activeTab === item.key
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {item.label}
                 </button>
               ))}
             </nav>
-          </div>
+          </aside>
 
-          {/* Tab Content */}
-          <div className="p-6">
-            {activeTab === 'overview' && renderOverview()}
-            {activeTab === 'properties' && renderProperties()}
-            {activeTab === 'maintenance' && renderMaintenance()}
-            {activeTab === 'profile' && renderProfile()}
+          {/* Content */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+            <div className="p-6">
+              {activeTab === 'overview' && renderOverview()}
+              {activeTab === 'properties' && renderProperties()}
+              {activeTab === 'maintenance' && renderMaintenance()}
+              {activeTab === 'profile' && renderProfile()}
+            </div>
           </div>
         </div>
       </div>
