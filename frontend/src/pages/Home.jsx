@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
-import SearchBar from "../components/SearchBar.jsx";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ListingsGrid from "../components/ListingsGrid.jsx";
 import ServicesSection from "../components/ServicesSection.jsx";
 import HelpSection from "../components/HelpSection.jsx";
-import { fetchListings as fetchListingsApi } from "../services/listingService.js";
 import house1 from "../assets/image/house1.png";
 import house2 from "../assets/image/house2.png";
 import room1 from "../assets/image/room1.png";
 import room2 from "../assets/image/r00m2.png";
 
 const Home = () => {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState({
     mode: "rent",
     type: "all",
@@ -22,7 +22,7 @@ const Home = () => {
   const [loading, setLoading] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
-  const images = [house1, house2, room1, room2];
+  const images = useMemo(() => [house1, house2, room1, room2], []);
 
   const handleChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -40,6 +40,12 @@ const Home = () => {
         filteredProperties = filteredProperties.filter(p => p.listingType === 'For Rent' || p.listingType === 'For Both');
       } else if (filters.mode === 'buy') {
         filteredProperties = filteredProperties.filter(p => p.listingType === 'For Sale' || p.listingType === 'For Both');
+      }
+
+      if (filters.type && filters.type !== "all") {
+        filteredProperties = filteredProperties.filter(
+          (p) => String(p.propertyType || "").toLowerCase() === String(filters.type).toLowerCase()
+        );
       }
       
       if (filters.city) {
@@ -64,7 +70,8 @@ const Home = () => {
       
       // Set featured listings (latest 6 properties)
       const latestProperties = storedProperties
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice()
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
         .slice(0, 6);
       setFeaturedListings(latestProperties);
       
@@ -80,7 +87,7 @@ const Home = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Listen for storage changes to update featured listings
+  // Listen for storage changes (e.g., another tab updates listings)
   useEffect(() => {
     const handleStorageChange = () => {
       fetchListings();
@@ -88,69 +95,109 @@ const Home = () => {
     
     window.addEventListener('storage', handleStorageChange);
     
-    // Also check for changes every 5 seconds
-    const interval = setInterval(() => {
-      fetchListings();
-    }, 5000);
-    
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
     };
-  }, [filters]);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
-    }, 2000); // Change image every 2 seconds
+    }, 3000); // Change image every 3 seconds
 
     return () => clearInterval(interval);
   }, [images.length]);
 
   return (
-    <>
-      <section className="grid gap-6 md:grid-cols-[3fr,2fr] md:items-center">
-        <div className="group space-y-4 rounded-3xl bg-white/80 p-4 shadow-sm shadow-slate-900/5 ring-1 ring-transparent transition hover:-translate-y-1 hover:bg-white hover:shadow-lg hover:ring-primary/30 md:p-6">
-          <div className="relative h-96 w-full overflow-hidden rounded-lg">
-            <img 
-              src={images[currentImageIndex]} 
-              alt={`Property ${currentImageIndex + 1}`} 
-              className="h-full w-full object-cover transition-opacity duration-1000"
-            />
+    <div className="space-y-10">
+      <section className="grid gap-8 md:grid-cols-2 md:items-center">
+        <div className="space-y-5">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <span className="badge">Beginner-friendly</span>
+            <span className="badge">Nepal rentals</span>
+            <span className="badge">Dark mode</span>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-4xl">
+              Find your next home in Nepal
+            </h1>
+            <p className="max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
+              Search by city and budget, compare listings, and save time. Start
+              simple: choose Rent or Buy, then press Search.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate("/auth")}
+            >
+              Start searching
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => navigate("/auth")}
+            >
+              List a property
+            </button>
           </div>
         </div>
-        <div className="hidden h-full rounded-[32px] bg-slate-900/90 p-4 shadow-2xl md:block">
-          <div className="relative h-full rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 p-4">
-            <div className="mb-3 flex items-center justify-between text-xs text-slate-200">
-              <span className="font-semibold">Rend Nepal</span>
-              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px]">
-                Live preview
-              </span>
-            </div>
-            <div className="flex h-full items-center justify-center">
-              <p className="text-center text-slate-400">
-                Property listings will appear here
+
+        <div className="card p-3 md:p-4">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
+            <img
+              src={images[currentImageIndex]}
+              alt={`Featured property ${currentImageIndex + 1}`}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 to-transparent p-4">
+              <p className="text-sm font-semibold text-white">Explore homes</p>
+              <p className="text-xs text-white/80">
+                New listings show up here as you add properties.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mt-10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Featured homes in Nepal
-          </h2>
-          <button className="text-xs font-semibold text-primary hover:text-primary-dark">
+      <section className="space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Homes matching your search
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Login to use search and filters.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost justify-start px-0 py-0 text-sm font-semibold text-primary hover:text-primary-dark sm:justify-center"
+            onClick={() => navigate("/auth")}
+          >
             See all
           </button>
+        </div>
+        <ListingsGrid listings={listings} loading={loading} />
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Recently added
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Latest 6 properties you created in this demo.
+          </p>
         </div>
         <ListingsGrid listings={featuredListings} loading={loading} />
       </section>
 
       <ServicesSection />
       <HelpSection />
-    </>
+    </div>
   );
 };
 

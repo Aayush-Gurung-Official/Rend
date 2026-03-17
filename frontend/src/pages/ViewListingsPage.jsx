@@ -1,112 +1,153 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const ViewListingsPage = () => {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [filters, setFilters] = useState({
-    search: '',
-    propertyType: 'All',
-    listingType: 'All',
-    priceRange: 'All',
-    city: 'All'
+    search: "",
+    propertyType: "All",
+    listingType: "All",
+    city: "All",
   });
 
   useEffect(() => {
-    // Load listings from localStorage
-    const storedProperties = JSON.parse(localStorage.getItem('properties') || '[]');
+    const storedProperties = JSON.parse(localStorage.getItem("properties") || "[]");
     setListings(storedProperties);
   }, []);
 
   const handleFilterChange = (filterType, value) => {
-    setFilters(prev => ({ ...prev, [filterType]: value }));
+    setFilters((prev) => ({ ...prev, [filterType]: value }));
   };
 
-  const getFilteredProperties = () => {
-    let filtered = listings;
-    
+  const filtered = useMemo(() => {
+    let next = listings;
+
     if (filters.search) {
-      filtered = filtered.filter(property => 
-        property.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        property.address.toLowerCase().includes(filters.search.toLowerCase())
-      );
+      const q = filters.search.toLowerCase();
+      next = next.filter((property) => {
+        const name = String(property.name || "").toLowerCase();
+        const address = String(property.address || "").toLowerCase();
+        return name.includes(q) || address.includes(q);
+      });
     }
-    
-    if (filters.propertyType !== 'All') {
-      filtered = filtered.filter(property => property.propertyType === filters.propertyType);
-    }
-    
-    if (filters.listingType !== 'All') {
-      filtered = filtered.filter(property => property.listingType === filters.listingType);
-    }
-    
-    return filtered;
-  };
 
-  const handleEditProperty = (propertyId) => {
-    navigate(`/edit-property/${propertyId}`);
-  };
-
-  const handleDeleteProperty = (propertyId) => {
-    if (window.confirm('Are you sure you want to delete this property?')) {
-      const updatedListings = listings.filter(p => p.id !== propertyId);
-      localStorage.setItem('properties', JSON.stringify(updatedListings));
-      setListings(updatedListings);
-      alert('Property deleted successfully!');
+    if (filters.propertyType !== "All") {
+      next = next.filter((property) => property.propertyType === filters.propertyType);
     }
-  };
+
+    if (filters.listingType !== "All") {
+      next = next.filter((property) => property.listingType === filters.listingType);
+    }
+
+    if (filters.city !== "All") {
+      next = next.filter((property) => String(property.city || "") === filters.city);
+    }
+
+    return next;
+  }, [filters, listings]);
 
   const getPriceDisplay = (property) => {
-    if (property.listingType === 'For Sale') {
-      return `NPR ${parseInt(property.salePrice || 0).toLocaleString()}`;
-    } else if (property.listingType === 'For Rent') {
-      return `NPR ${parseInt(property.monthlyRent || 0).toLocaleString()}/month`;
-    } else {
-      return `NPR ${parseInt(property.monthlyRent || 0).toLocaleString()}/month`;
+    if (property.listingType === "For Sale") {
+      return `NPR ${parseInt(property.salePrice || 0, 10).toLocaleString()}`;
     }
+    if (property.listingType === "For Rent") {
+      return `NPR ${parseInt(property.monthlyRent || 0, 10).toLocaleString()}/month`;
+    }
+    return `NPR ${parseInt(property.monthlyRent || 0, 10).toLocaleString()}/month`;
   };
 
   const getPropertyImage = (property) => {
-    if (property.images && property.images.length > 0) {
-      return property.images[0];
-    }
-    return 'https://images.unsplash.com/photo-1512917770757-5?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&h=300&q=80';
+    if (property.images && property.images.length > 0) return property.images[0];
+    return "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&h=600&q=80";
+  };
+
+  const uniqueCities = useMemo(() => {
+    const set = new Set(listings.map((p) => String(p.city || "")).filter(Boolean));
+    return ["All", ...Array.from(set).sort()];
+  }, [listings]);
+
+  const handleDeleteProperty = (propertyId) => {
+    if (!window.confirm("Delete this property?")) return;
+    const updated = listings.filter((p) => p.id !== propertyId);
+    localStorage.setItem("properties", JSON.stringify(updated));
+    setListings(updated);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="mb-8">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="mb-4 text-primary hover:text-primary/80 font-medium"
-          >
-            ← Back to Dashboard
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">View All Listings</h1>
-          <p className="text-gray-600">Manage and view all your property listings</p>
-        </div>
+    <div className="min-h-screen bg-slate-50 py-8 dark:bg-slate-950/20">
+      <div className="rend-container space-y-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard")}
+              className="btn btn-ghost px-0 py-0 text-sm text-primary hover:text-primary-dark"
+            >
+              ← Back to dashboard
+            </button>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100 md:text-3xl">
+              View listings
+            </h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              Manage your properties saved in this demo.
+            </p>
+          </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate("/add-property")}
+          >
+            + Add property
+          </button>
+        </header>
+
+        <section className="card-solid p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              Filters
+            </h2>
+            <button
+              type="button"
+              className="btn btn-ghost px-2 py-1 text-xs"
+              onClick={() =>
+              setFilters({
+                search: "",
+                propertyType: "All",
+                listingType: "All",
+                city: "All",
+              })
+            }
+          >
+              Reset
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+              <label className="label" htmlFor="listings-search">
+                Search
+              </label>
               <input
+                id="listings-search"
                 type="text"
                 value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                placeholder="Search properties..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary"
+                onChange={(e) => handleFilterChange("search", e.target.value)}
+                placeholder="Name or address"
+                className="input w-full"
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Property Type</label>
+              <label className="label" htmlFor="listings-type">
+                Property type
+              </label>
               <select
+                id="listings-type"
                 value={filters.propertyType}
-                onChange={(e) => handleFilterChange('propertyType', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                onChange={(e) => handleFilterChange("propertyType", e.target.value)}
+                className="input w-full"
               >
                 <option>All</option>
                 <option>Apartment</option>
@@ -117,12 +158,16 @@ const ViewListingsPage = () => {
                 <option>Land</option>
               </select>
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Listing Type</label>
+              <label className="label" htmlFor="listings-listingtype">
+                Listing type
+              </label>
               <select
+                id="listings-listingtype"
                 value={filters.listingType}
-                onChange={(e) => handleFilterChange('listingType', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                onChange={(e) => handleFilterChange("listingType", e.target.value)}
+                className="input w-full"
               >
                 <option>All</option>
                 <option>For Rent</option>
@@ -130,109 +175,107 @@ const ViewListingsPage = () => {
                 <option>For Both</option>
               </select>
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+              <label className="label" htmlFor="listings-city">
+                City
+              </label>
               <select
-                value={filters.priceRange}
-                onChange={(e) => handleFilterChange('priceRange', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                id="listings-city"
+                value={filters.city}
+                onChange={(e) => handleFilterChange("city", e.target.value)}
+                className="input w-full"
               >
-                <option>All</option>
-                <option>Under 50,000</option>
-                <option>50,000 - 100,000</option>
-                <option>100,000 - 200,000</option>
-                <option>Above 200,000</option>
+                {uniqueCities.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Properties Grid */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800">
-              Your Properties ({getFilteredProperties().length})
+        <section className="card-solid p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Your properties <span className="text-slate-400">({filtered.length})</span>
             </h2>
-            <button className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-              + Add New Property
-            </button>
+            <div className="text-sm text-slate-600 dark:text-slate-300">
+              Tip: Click a card to preview.
+            </div>
           </div>
-          
-          {getFilteredProperties().length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-gray-400 text-lg">🏠</div>
-              <p className="text-gray-500 mt-2">No properties found matching your filters.</p>
-              <p className="text-gray-400">Try adjusting your search criteria.</p>
+
+          {filtered.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
+              No properties found. Try clearing filters or add a new property.
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {getFilteredProperties().map((property) => (
-                <div
+            <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((property) => (
+                <article
                   key={property.id}
-                  className="overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-900/5 ring-1 ring-slate-200 transition-all hover:shadow-lg hover:-translate-y-1"
+                  className="group overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-900/5 ring-1 ring-slate-200 transition hover:-translate-y-1 hover:shadow-lg dark:bg-slate-900/40 dark:ring-slate-800"
                 >
-                  <div className="relative h-40 w-full overflow-hidden">
-                    <img
-                      src={getPropertyImage(property)}
-                      alt={property.name}
-                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                    />
-                    {property.featured && (
-                      <span className="absolute left-3 top-3 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white shadow-sm">
-                        Featured
-                      </span>
-                    )}
-                    <span className="absolute right-3 top-3 rounded-full bg-white/90 backdrop-blur px-2 py-1 text-xs font-medium">
-                      {property.listingType}
-                    </span>
-                  </div>
-                  <div className="space-y-2 p-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        {property.name}
-                      </h3>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                        {property.propertyType}
+                  <button
+                    type="button"
+                    className="block w-full text-left"
+                    onClick={() => navigate(`/listing/${property.id}`)}
+                  >
+                    <div className="relative h-44 w-full overflow-hidden">
+                      <img
+                        src={getPropertyImage(property)}
+                        alt={property.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 backdrop-blur dark:bg-slate-950/60 dark:text-slate-200 dark:ring-slate-800">
+                        {property.listingType}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500">
-                      📍 {property.address}, {property.city}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {property.bedrooms ? `${property.bedrooms} beds • ` : ""} 
-                      {property.bathrooms ? `${property.bathrooms} baths • ` : ""}
-                      {property.squareFootage ? `${property.squareFootage} sqft` : ""}
-                    </p>
-                    {property.furnished && (
-                      <p className="text-xs text-slate-500">
-                        🏠 {property.furnished}
+
+                    <div className="space-y-2 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {property.name}
+                        </h3>
+                        <span className="badge shrink-0">{property.propertyType}</span>
+                      </div>
+
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
+                        <span className="font-semibold">📍</span> {property.address},{" "}
+                        {property.city}
                       </p>
-                    )}
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="text-sm font-bold text-primary">
-                        {getPriceDisplay(property)}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditProperty(property.id)}
-                          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:border-primary hover:text-primary transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProperty(property.id)}
-                          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-red-600 hover:border-red-300 hover:text-red-700 transition-colors"
-                        >
-                          Delete
-                        </button>
+
+                      <div className="flex items-center justify-between pt-2">
+                        <div className="text-sm font-bold text-primary">
+                          {getPriceDisplay(property)}
+                        </div>
                       </div>
                     </div>
+                  </button>
+
+                  <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+                    <button
+                      type="button"
+                      className="btn btn-outline rounded-full px-3 py-1.5 text-xs"
+                      onClick={() => navigate(`/edit-property/${property.id}`)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline rounded-full px-3 py-1.5 text-xs text-red-600 hover:border-red-300 hover:text-red-700 dark:text-red-300 dark:hover:border-red-700/50"
+                      onClick={() => handleDeleteProperty(property.id)}
+                    >
+                      Delete
+                    </button>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

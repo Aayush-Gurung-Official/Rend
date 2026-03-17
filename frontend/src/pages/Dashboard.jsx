@@ -58,6 +58,7 @@ const Dashboard = () => {
   // Agreement management state
   const [agreements, setAgreements] = useState([]);
   const [agreementType, setAgreementType] = useState('lease'); // lease, purchase, maintenance, etc.
+  const [agreementPropertyFilter, setAgreementPropertyFilter] = useState("all"); // all | propertyKey
   const [selectedAgreement, setSelectedAgreement] = useState(null);
   const [agreementForm, setAgreementForm] = useState({
     title: '',
@@ -110,6 +111,18 @@ const Dashboard = () => {
       email: 'sita.sharma@email.com'
     }
   ]);
+  const [tenantSearch, setTenantSearch] = useState("");
+  const [tenantStatusFilter, setTenantStatusFilter] = useState("all"); // all | Paid | Pending | Overdue
+  const [tenantPropertyFilter, setTenantPropertyFilter] = useState("all"); // all | property name
+  const [selectedTenantId, setSelectedTenantId] = useState(null);
+
+  const [ownerListingView, setOwnerListingView] = useState("grid"); // grid | table
+  const [ownerListingSearch, setOwnerListingSearch] = useState("");
+  const [ownerListingTypeFilter, setOwnerListingTypeFilter] = useState("all"); // all | For Rent | For Sale | For Both
+  const [ownerListingPropertyTypeFilter, setOwnerListingPropertyTypeFilter] = useState("all"); // all | Apartment | House | ...
+
+  const [ownerFinanceRange, setOwnerFinanceRange] = useState("month"); // month | year | all
+  const [ownerFinancePropertyFilter, setOwnerFinancePropertyFilter] = useState("all"); // all | property key
 
   const [tenantRentalProperties, setTenantRentalProperties] = useState([]);
 
@@ -160,8 +173,10 @@ const Dashboard = () => {
   const [contactDraft, setContactDraft] = useState({ subject: "", message: "" });
   const [contactSuccess, setContactSuccess] = useState("");
 
+  const [tenantMaintenanceMode, setTenantMaintenanceMode] = useState("view"); // view | create | edit
   const [rentAccounts, setRentAccounts] = useState([]);
   const [selectedRentAccountId, setSelectedRentAccountId] = useState(null);
+  const [rentMode, setRentMode] = useState("pay"); // pay | create | edit
   const [rentDraft, setRentDraft] = useState({
     propertyId: "",
     propertyLabel: "",
@@ -225,6 +240,7 @@ const Dashboard = () => {
   const openNewTenantMaintenanceRequest = () => {
     setTenantMaintenanceSuccess("");
     setTenantMaintenanceErrors({});
+    setTenantMaintenanceMode("create");
     setSelectedTenantMaintenanceId(null);
     setTenantMaintenanceDraft({
       propertyLabel: tenantRentalProperties[0]?.label ?? "",
@@ -280,6 +296,7 @@ const Dashboard = () => {
 
     setTenantMaintenanceRequests((prev) => [newRequest, ...prev]);
     setSelectedTenantMaintenanceId(newRequest.id);
+    setTenantMaintenanceMode("view");
     setTenantMaintenanceSuccess("Request submitted. Your landlord will be notified.");
     setTenantMaintenanceDraft((prev) => ({ ...prev, title: "", description: "" }));
 
@@ -299,6 +316,51 @@ const Dashboard = () => {
       STORAGE_KEYS.maintenanceRequests,
       JSON.stringify([storedItem, ...stored])
     );
+  };
+
+  const updateTenantMaintenanceRequest = (e) => {
+    e.preventDefault();
+    setTenantMaintenanceSuccess("");
+
+    if (!selectedTenantMaintenanceId) return;
+
+    const nextErrors = {};
+    if (!tenantMaintenanceDraft.title.trim()) nextErrors.title = "Please enter a short title.";
+    if (!tenantMaintenanceDraft.description.trim()) nextErrors.description = "Please describe the issue.";
+    setTenantMaintenanceErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setTenantMaintenanceRequests((prev) =>
+      prev.map((r) =>
+        r.id === selectedTenantMaintenanceId
+          ? {
+              ...r,
+              title: tenantMaintenanceDraft.title.trim(),
+              category: tenantMaintenanceDraft.category,
+              priority: tenantMaintenanceDraft.priority,
+              description: tenantMaintenanceDraft.description.trim(),
+            }
+          : r
+      )
+    );
+
+    const stored = safeJsonParse(window.localStorage.getItem(STORAGE_KEYS.maintenanceRequests), []);
+    const nextStored = stored.map((item) =>
+      item.id === selectedTenantMaintenanceId && item.type === "request"
+        ? {
+            ...item,
+            title: tenantMaintenanceDraft.title.trim(),
+            category: tenantMaintenanceDraft.category,
+            priority: tenantMaintenanceDraft.priority,
+            description: tenantMaintenanceDraft.description.trim(),
+            updatedAt: new Date().toISOString(),
+          }
+        : item
+    );
+    window.localStorage.setItem(STORAGE_KEYS.maintenanceRequests, JSON.stringify(nextStored));
+
+    setTenantMaintenanceMode("view");
+    setTenantMaintenanceSuccess("Request updated.");
   };
 
   const tenantMaintenanceStatusStyles = (status) => {
@@ -328,14 +390,20 @@ const Dashboard = () => {
     if (!selectedContactPropertyId) setSelectedContactPropertyId(nextMine[0]?.id ?? null);
   };
 
-  const createRentAccount = (e) => {
+  const saveRentAccount = (e) => {
     e.preventDefault();
     setRentSuccess("");
     if (!user?.username) return;
     if (!rentDraft.propertyLabel.trim()) return;
     if (!rentDraft.monthlyRent || Number.isNaN(Number(rentDraft.monthlyRent))) return;
 
-    const propertyId = rentDraft.propertyId || `prop_${Date.now()}`;
+    const existingAll = loadArray(STORAGE_KEYS.rentAccounts);
+    const existing =
+      rentMode === "edit" && selectedRentAccountId
+        ? existingAll.find((a) => a.id === selectedRentAccountId) ?? null
+        : null;
+
+    const propertyId = rentDraft.propertyId || existing?.propertyId || `prop_${Date.now()}`;
     const landlordName = rentDraft.landlordName.trim() || "Landlord";
     const ownerUsername = rentDraft.ownerUsername.trim() || "owner";
 
@@ -352,7 +420,27 @@ const Dashboard = () => {
     };
     upsertTenantProperty(property);
 
-    const allAccounts = loadArray(STORAGE_KEYS.rentAccounts);
+    if (existing) {
+      const updated = {
+        ...existing,
+        propertyId,
+        propertyLabel: property.label,
+        ownerUsername,
+        landlordName,
+        monthlyRent: Number(rentDraft.monthlyRent),
+        dueDay: String(rentDraft.dueDay || "15"),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const nextAll = existingAll.map((a) => (a.id === existing.id ? updated : a));
+      saveArray(STORAGE_KEYS.rentAccounts, nextAll);
+      setRentAccounts(nextAll.filter((a) => a.tenantUsername === user.username));
+      setSelectedRentAccountId(updated.id);
+      setRentMode("pay");
+      setRentSuccess("Rent item updated.");
+      return;
+    }
+
     const newAccount = {
       id: `rent_${Date.now()}`,
       tenantUsername: user.username,
@@ -367,10 +455,9 @@ const Dashboard = () => {
       createdAt: new Date().toISOString(),
     };
 
-    const nextAll = [newAccount, ...allAccounts];
+    const nextAll = [newAccount, ...existingAll];
     saveArray(STORAGE_KEYS.rentAccounts, nextAll);
-    const mine = nextAll.filter((a) => a.tenantUsername === user.username);
-    setRentAccounts(mine);
+    setRentAccounts(nextAll.filter((a) => a.tenantUsername === user.username));
     setSelectedRentAccountId(newAccount.id);
     setRentDraft((prev) => ({
       ...prev,
@@ -380,6 +467,7 @@ const Dashboard = () => {
       ownerUsername: "",
       monthlyRent: "",
     }));
+    setRentMode("pay");
     setRentSuccess("Rent item created.");
   };
 
@@ -2579,6 +2667,8 @@ startxref
                     type="button"
                     onClick={() => {
                       setRentSuccess("");
+                      setRentMode("create");
+                      setSelectedRentAccountId(null);
                       const firstProp = tenantRentalProperties[0];
                       setRentDraft({
                         propertyId: firstProp?.id || "",
@@ -2603,7 +2693,11 @@ startxref
                       <button
                         key={a.id}
                         type="button"
-                        onClick={() => setSelectedRentAccountId(a.id)}
+                        onClick={() => {
+                          setRentSuccess("");
+                          setSelectedRentAccountId(a.id);
+                          setRentMode("pay");
+                        }}
                         className={`w-full text-left rounded-2xl border p-3 transition ${
                           selectedRentAccountId === a.id
                             ? "border-primary bg-primary/5 shadow-sm"
@@ -2640,9 +2734,51 @@ startxref
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-100">
-                  <h2 className="text-base font-semibold text-gray-900">Pay Rent</h2>
-                  <p className="text-xs text-gray-500">Select a rent item on the left or create a new one.</p>
+                <div className="p-5 border-b border-gray-100 flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-900">
+                      {rentMode === "pay" ? "Pay Rent" : rentMode === "edit" ? "Edit Rent Item" : "Create Rent Item"}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      {rentMode === "pay"
+                        ? "Select a rent item on the left or create a new one."
+                        : "Save details for this property to pay rent later."}
+                    </p>
+                  </div>
+                  {rentMode === "pay" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const selected = rentAccounts.find((a) => a.id === selectedRentAccountId) ?? null;
+                        if (!selected) return;
+                        setRentSuccess("");
+                        setRentMode("edit");
+                        setRentDraft({
+                          propertyId: selected.propertyId || "",
+                          propertyLabel: selected.propertyLabel || "",
+                          ownerUsername: selected.ownerUsername || "",
+                          landlordName: selected.landlordName || "",
+                          monthlyRent: String(selected.monthlyRent ?? ""),
+                          dueDay: String(selected.dueDay || "15"),
+                        });
+                      }}
+                      disabled={!selectedRentAccountId}
+                      className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRentSuccess("");
+                        setRentMode("pay");
+                      }}
+                      className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Back
+                    </button>
+                  )}
                 </div>
 
                 <div className="p-5 space-y-5">
@@ -2652,56 +2788,57 @@ startxref
                     </div>
                   ) : null}
 
-                  {(() => {
-                    const selected = rentAccounts.find((a) => a.id === selectedRentAccountId) ?? null;
+                  {rentMode === "pay" ? (
+                    (() => {
+                      const selected = rentAccounts.find((a) => a.id === selectedRentAccountId) ?? null;
 
-                    if (!selected) {
+                      if (!selected) {
+                        return (
+                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                            No rent item selected.
+                          </div>
+                        );
+                      }
+
+                      const lastPaid = selected.lastPaidAt
+                        ? new Date(selected.lastPaidAt).toLocaleString()
+                        : "Not paid yet";
+
                       return (
-                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-                          No rent item selected.
-                        </div>
-                      );
-                    }
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-sm font-semibold text-gray-900">{selected.propertyLabel}</p>
+                            <p className="text-xs text-gray-500">{selected.landlordName}</p>
+                            <div className="mt-3 space-y-1 text-sm text-gray-700">
+                              <p>
+                                <span className="text-gray-500">Monthly:</span> NPR{" "}
+                                {Number(selected.monthlyRent).toLocaleString()}
+                              </p>
+                              <p>
+                                <span className="text-gray-500">Due day:</span> {selected.dueDay}
+                              </p>
+                              <p>
+                                <span className="text-gray-500">Last paid:</span> {lastPaid}
+                              </p>
+                            </div>
+                          </div>
 
-                    const lastPaid = selected.lastPaidAt ? new Date(selected.lastPaidAt).toLocaleString() : "Not paid yet";
-
-                    return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                          <p className="text-sm font-semibold text-gray-900">{selected.propertyLabel}</p>
-                          <p className="text-xs text-gray-500">{selected.landlordName}</p>
-                          <div className="mt-3 space-y-1 text-sm text-gray-700">
-                            <p>
-                              <span className="text-gray-500">Monthly:</span> NPR{" "}
-                              {Number(selected.monthlyRent).toLocaleString()}
-                            </p>
-                            <p>
-                              <span className="text-gray-500">Due day:</span> {selected.dueDay}
-                            </p>
-                            <p>
-                              <span className="text-gray-500">Last paid:</span> {lastPaid}
-                            </p>
+                          <div className="rounded-2xl border border-gray-200 p-4">
+                            <p className="text-sm font-semibold text-gray-900">Payment</p>
+                            <p className="mt-1 text-xs text-gray-500">This demo records payment as Paid.</p>
+                            <button
+                              type="button"
+                              onClick={() => payRentNow(selected.id)}
+                              className="mt-4 w-full rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            >
+                              Pay NPR {Number(selected.monthlyRent).toLocaleString()}
+                            </button>
                           </div>
                         </div>
-
-                        <div className="rounded-2xl border border-gray-200 p-4">
-                          <p className="text-sm font-semibold text-gray-900">Payment</p>
-                          <p className="mt-1 text-xs text-gray-500">This demo records payment as Paid.</p>
-                          <button
-                            type="button"
-                            onClick={() => payRentNow(selected.id)}
-                            className="mt-4 w-full rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                          >
-                            Pay NPR {Number(selected.monthlyRent).toLocaleString()}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <div className="border-t border-gray-100 pt-5">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Create Rent Item</h3>
-                    <form onSubmit={createRentAccount} className="space-y-4">
+                      );
+                    })()
+                  ) : (
+                    <form onSubmit={saveRentAccount} className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Use Existing Property</label>
@@ -2804,11 +2941,11 @@ startxref
                           type="submit"
                           className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
-                          Create
+                          {rentMode === "edit" ? "Save" : "Create"}
                         </button>
                       </div>
                     </form>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -2853,6 +2990,35 @@ startxref
                 </nav>
               </div>
 
+              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-gray-600">View agreements per property.</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Property</span>
+                  <select
+                    value={agreementPropertyFilter}
+                    onChange={(e) => setAgreementPropertyFilter(e.target.value)}
+                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="all">All properties</option>
+                    {(() => {
+                      const items = Array.isArray(agreements) ? agreements : [];
+                      const map = new Map();
+                      for (const a of items) {
+                        const key = a?.property?._id || a?.propertyId || a?.property?.name;
+                        if (!key) continue;
+                        const label = a?.property?.name || a?.propertyLabel || String(key);
+                        if (!map.has(String(key))) map.set(String(key), label);
+                      }
+                      return Array.from(map.entries()).map(([key, label]) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+              </div>
+
               {/* Agreement Content Based on Type */}
               {agreementType === 'lease' && (
                 <div className="space-y-6">
@@ -2864,7 +3030,16 @@ startxref
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {(Array.isArray(agreements) ? agreements.filter(a => a.type === 'lease') : []).map((agreement) => (
+                        {(Array.isArray(agreements)
+                          ? agreements.filter((a) => {
+                              const key = a?.property?._id || a?.propertyId || a?.property?.name || "";
+                              return (
+                                a.type === "lease" &&
+                                (agreementPropertyFilter === "all" || String(key) === agreementPropertyFilter)
+                              );
+                            })
+                          : []
+                        ).map((agreement) => (
                           <div key={agreement._id} className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start mb-3">
                               <div>
@@ -2937,7 +3112,16 @@ startxref
                             </div>
                           </div>
                         ))}
-                        {agreements.filter(a => a.type === 'lease').length === 0 && (
+                        {(Array.isArray(agreements)
+                          ? agreements.filter((a) => {
+                              const key = a?.property?._id || a?.propertyId || a?.property?.name || "";
+                              return (
+                                a.type === "lease" &&
+                                (agreementPropertyFilter === "all" || String(key) === agreementPropertyFilter)
+                              );
+                            })
+                          : []
+                        ).length === 0 && (
                           <div className="text-center py-8">
                             <p className="text-gray-600">No lease agreements found</p>
                           </div>
@@ -2958,7 +3142,16 @@ startxref
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {(Array.isArray(agreements) ? agreements.filter(a => a.type === 'purchase') : []).map((agreement) => (
+                        {(Array.isArray(agreements)
+                          ? agreements.filter((a) => {
+                              const key = a?.property?._id || a?.propertyId || a?.property?.name || "";
+                              return (
+                                a.type === "purchase" &&
+                                (agreementPropertyFilter === "all" || String(key) === agreementPropertyFilter)
+                              );
+                            })
+                          : []
+                        ).map((agreement) => (
                           <div key={agreement._id} className="bg-white rounded-lg p-4 border border-blue-200 hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start mb-3">
                               <div>
@@ -3031,7 +3224,16 @@ startxref
                             </div>
                           </div>
                         ))}
-                        {agreements.filter(a => a.type === 'purchase').length === 0 && (
+                        {(Array.isArray(agreements)
+                          ? agreements.filter((a) => {
+                              const key = a?.property?._id || a?.propertyId || a?.property?.name || "";
+                              return (
+                                a.type === "purchase" &&
+                                (agreementPropertyFilter === "all" || String(key) === agreementPropertyFilter)
+                              );
+                            })
+                          : []
+                        ).length === 0 && (
                           <div className="text-center py-8">
                             <p className="text-gray-600">No purchase agreements found</p>
                             <p className="text-sm text-gray-500 mt-2">Purchase agreements will appear here when you buy properties</p>
@@ -3053,7 +3255,16 @@ startxref
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {(Array.isArray(agreements) ? agreements.filter(a => a.type === 'maintenance') : []).map((agreement) => (
+                        {(Array.isArray(agreements)
+                          ? agreements.filter((a) => {
+                              const key = a?.property?._id || a?.propertyId || a?.property?.name || "";
+                              return (
+                                a.type === "maintenance" &&
+                                (agreementPropertyFilter === "all" || String(key) === agreementPropertyFilter)
+                              );
+                            })
+                          : []
+                        ).map((agreement) => (
                           <div key={agreement._id} className="bg-white rounded-lg p-4 border border-yellow-200 hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start mb-3">
                               <div>
@@ -3120,7 +3331,16 @@ startxref
                             </div>
                           </div>
                         ))}
-                        {agreements.filter(a => a.type === 'maintenance').length === 0 && (
+                        {(Array.isArray(agreements)
+                          ? agreements.filter((a) => {
+                              const key = a?.property?._id || a?.propertyId || a?.property?.name || "";
+                              return (
+                                a.type === "maintenance" &&
+                                (agreementPropertyFilter === "all" || String(key) === agreementPropertyFilter)
+                              );
+                            })
+                          : []
+                        ).length === 0 && (
                           <div className="text-center py-8">
                             <p className="text-gray-600">No maintenance agreements found</p>
                           </div>
@@ -3141,7 +3361,16 @@ startxref
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {(Array.isArray(agreements) ? agreements.filter(a => a.type === 'termination') : []).map((agreement) => (
+                        {(Array.isArray(agreements)
+                          ? agreements.filter((a) => {
+                              const key = a?.property?._id || a?.propertyId || a?.property?.name || "";
+                              return (
+                                a.type === "termination" &&
+                                (agreementPropertyFilter === "all" || String(key) === agreementPropertyFilter)
+                              );
+                            })
+                          : []
+                        ).map((agreement) => (
                           <div key={agreement._id} className="bg-white rounded-lg p-4 border border-red-200 hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start mb-3">
                               <div>
@@ -3206,7 +3435,16 @@ startxref
                             </div>
                           </div>
                         ))}
-                        {agreements.filter(a => a.type === 'termination').length === 0 && (
+                        {(Array.isArray(agreements)
+                          ? agreements.filter((a) => {
+                              const key = a?.property?._id || a?.propertyId || a?.property?.name || "";
+                              return (
+                                a.type === "termination" &&
+                                (agreementPropertyFilter === "all" || String(key) === agreementPropertyFilter)
+                              );
+                            })
+                          : []
+                        ).length === 0 && (
                           <div className="text-center py-8">
                             <p className="text-gray-600">No termination notices found</p>
                           </div>
@@ -3288,7 +3526,12 @@ startxref
                         <button
                           key={request.id}
                           type="button"
-                          onClick={() => setSelectedTenantMaintenanceId(request.id)}
+                          onClick={() => {
+                            setTenantMaintenanceSuccess("");
+                            setTenantMaintenanceErrors({});
+                            setSelectedTenantMaintenanceId(request.id);
+                            setTenantMaintenanceMode("view");
+                          }}
                           className={`w-full text-left rounded-2xl border p-3 transition ${
                             selectedTenantMaintenanceId === request.id
                               ? "border-primary bg-primary/5 shadow-sm"
@@ -3330,132 +3573,262 @@ startxref
 
               {/* Request form */}
               <div ref={tenantMaintenanceFormRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-                <div className="p-5 border-b border-gray-100">
-                  <h2 className="text-base font-semibold text-gray-900">Request Form</h2>
-                  <p className="text-xs text-gray-500">Create a new ticket for maintenance help.</p>
+                <div className="p-5 border-b border-gray-100 flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-900">
+                      {tenantMaintenanceMode === "view"
+                        ? "Request Details"
+                        : tenantMaintenanceMode === "edit"
+                        ? "Edit Request"
+                        : "New Request"}
+                    </h2>
+                    <p className="text-xs text-gray-500">
+                      {tenantMaintenanceMode === "view"
+                        ? "Select a request on the left to view details."
+                        : "Fill the form and submit to notify your landlord."}
+                    </p>
+                  </div>
+
+                  {tenantMaintenanceMode === "view" ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={openNewTenantMaintenanceRequest}
+                        className="rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        + New
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const selected =
+                            tenantMaintenanceRequests.find((r) => r.id === selectedTenantMaintenanceId) ?? null;
+                          if (!selected) return;
+                          setTenantMaintenanceSuccess("");
+                          setTenantMaintenanceErrors({});
+                          setTenantMaintenanceMode("edit");
+                          setTenantMaintenanceDraft((prev) => ({
+                            ...prev,
+                            propertyLabel: selected.propertyLabel,
+                            category: selected.category,
+                            priority: selected.priority,
+                            title: selected.title,
+                            description: selected.description,
+                          }));
+                        }}
+                        disabled={!selectedTenantMaintenanceId}
+                        className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTenantMaintenanceSuccess("");
+                        setTenantMaintenanceErrors({});
+                        setTenantMaintenanceMode("view");
+                      }}
+                      className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Back
+                    </button>
+                  )}
                 </div>
 
-                <form onSubmit={submitTenantMaintenanceRequest} className="p-5 space-y-5">
+                <div className="p-5 space-y-5">
                   {tenantMaintenanceSuccess ? (
                     <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                       {tenantMaintenanceSuccess}
                     </div>
                   ) : null}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Property</label>
-                      <select
-                        value={tenantMaintenanceDraft.propertyLabel}
-                        onChange={(e) =>
-                          setTenantMaintenanceDraft((prev) => ({ ...prev, propertyLabel: e.target.value }))
-                        }
-                        className={tenantMaintenanceInputBase}
-                      >
-                        {tenantRentalProperties.map((p) => (
-                          <option key={p.id} value={p.label}>
-                            {p.label} (Landlord: {p.landlord.name})
-                          </option>
-                        ))}
-                      </select>
-                      {tenantMaintenanceErrors.propertyLabel ? (
-                        <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.propertyLabel}</p>
-                      ) : null}
-                    </div>
+                  {tenantMaintenanceMode === "view" ? (
+                    (() => {
+                      const selected =
+                        tenantMaintenanceRequests.find((r) => r.id === selectedTenantMaintenanceId) ?? null;
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Issue Type</label>
-                      <select
-                        value={tenantMaintenanceDraft.category}
-                        onChange={(e) =>
-                          setTenantMaintenanceDraft((prev) => ({ ...prev, category: e.target.value }))
-                        }
-                        className={tenantMaintenanceInputBase}
-                      >
-                        {["Plumbing", "Electrical", "HVAC", "Appliance", "Other"].map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                      <select
-                        value={tenantMaintenanceDraft.priority}
-                        onChange={(e) =>
-                          setTenantMaintenanceDraft((prev) => ({ ...prev, priority: e.target.value }))
-                        }
-                        className={tenantMaintenanceInputBase}
-                      >
-                        {["Emergency", "High", "Medium", "Low"].map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
-                      <input
-                        type="datetime-local"
-                        value={tenantMaintenanceDraft.preferredDateTime}
-                        onChange={(e) =>
-                          setTenantMaintenanceDraft((prev) => ({ ...prev, preferredDateTime: e.target.value }))
-                        }
-                        className={tenantMaintenanceInputBase}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                    <input
-                      type="text"
-                      value={tenantMaintenanceDraft.title}
-                      onChange={(e) => setTenantMaintenanceDraft((prev) => ({ ...prev, title: e.target.value }))}
-                      className={tenantMaintenanceInputBase}
-                      placeholder="Short summary (e.g., Water leak under sink)"
-                    />
-                    {tenantMaintenanceErrors.title ? (
-                      <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.title}</p>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea
-                      rows="5"
-                      value={tenantMaintenanceDraft.description}
-                      onChange={(e) =>
-                        setTenantMaintenanceDraft((prev) => ({ ...prev, description: e.target.value }))
+                      if (!selected) {
+                        return (
+                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                            No request selected. Click <span className="font-semibold">+ New</span> to create one.
+                          </div>
+                        );
                       }
-                      placeholder="Please describe the maintenance issue in detail..."
-                      className={`${tenantMaintenanceInputBase} min-h-[140px] resize-y`}
-                    />
-                    {tenantMaintenanceErrors.description ? (
-                      <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.description}</p>
-                    ) : null}
-                  </div>
 
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setActive('home')}
-                      className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                      return (
+                        <div className="space-y-4">
+                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-900">{selected.title}</p>
+                                <p className="text-xs text-gray-500">
+                                  {selected.propertyLabel}{selected.landlordName ? ` • ${selected.landlordName}` : ""}
+                                </p>
+                              </div>
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tenantMaintenanceStatusStyles(
+                                  selected.status
+                                )}`}
+                              >
+                                {selected.status}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                              <span className="rounded-full bg-white px-2 py-0.5 text-gray-800 border border-gray-200">
+                                {selected.category}
+                              </span>
+                              <span className="rounded-full bg-white px-2 py-0.5 text-gray-800 border border-gray-200">
+                                {selected.priority}
+                              </span>
+                              <span className="ml-auto text-gray-500">{selected.date}</span>
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border border-gray-200 p-4">
+                            <p className="text-sm font-semibold text-gray-900">Description</p>
+                            <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">{selected.description}</p>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <form
+                      onSubmit={tenantMaintenanceMode === "edit" ? updateTenantMaintenanceRequest : submitTenantMaintenanceRequest}
+                      className="space-y-5"
                     >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    >
-                      Submit Request
-                    </button>
-                  </div>
-                </form>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Property</label>
+                          <select
+                            value={tenantMaintenanceDraft.propertyLabel}
+                            onChange={(e) =>
+                              setTenantMaintenanceDraft((prev) => ({ ...prev, propertyLabel: e.target.value }))
+                            }
+                            className={tenantMaintenanceInputBase}
+                            disabled={tenantMaintenanceMode === "edit"}
+                          >
+                            {tenantRentalProperties.map((p) => (
+                              <option key={p.id} value={p.label}>
+                                {p.label} (Landlord: {p.landlord.name})
+                              </option>
+                            ))}
+                          </select>
+                          {tenantMaintenanceErrors.propertyLabel ? (
+                            <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.propertyLabel}</p>
+                          ) : null}
+                          {tenantMaintenanceMode === "edit" ? (
+                            <p className="mt-1 text-xs text-gray-500">Property cannot be changed after submission.</p>
+                          ) : null}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Issue Type</label>
+                          <select
+                            value={tenantMaintenanceDraft.category}
+                            onChange={(e) =>
+                              setTenantMaintenanceDraft((prev) => ({ ...prev, category: e.target.value }))
+                            }
+                            className={tenantMaintenanceInputBase}
+                          >
+                            {["Plumbing", "Electrical", "HVAC", "Appliance", "Other"].map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                          <select
+                            value={tenantMaintenanceDraft.priority}
+                            onChange={(e) =>
+                              setTenantMaintenanceDraft((prev) => ({ ...prev, priority: e.target.value }))
+                            }
+                            className={tenantMaintenanceInputBase}
+                          >
+                            {["Emergency", "High", "Medium", "Low"].map((p) => (
+                              <option key={p} value={p}>
+                                {p}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {tenantMaintenanceMode === "create" ? (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
+                            <input
+                              type="datetime-local"
+                              value={tenantMaintenanceDraft.preferredDateTime}
+                              onChange={(e) =>
+                                setTenantMaintenanceDraft((prev) => ({ ...prev, preferredDateTime: e.target.value }))
+                              }
+                              className={tenantMaintenanceInputBase}
+                            />
+                          </div>
+                        ) : (
+                          <div />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <input
+                          type="text"
+                          value={tenantMaintenanceDraft.title}
+                          onChange={(e) =>
+                            setTenantMaintenanceDraft((prev) => ({ ...prev, title: e.target.value }))
+                          }
+                          className={tenantMaintenanceInputBase}
+                          placeholder="Short summary (e.g., Water leak under sink)"
+                        />
+                        {tenantMaintenanceErrors.title ? (
+                          <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.title}</p>
+                        ) : null}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea
+                          rows="5"
+                          value={tenantMaintenanceDraft.description}
+                          onChange={(e) =>
+                            setTenantMaintenanceDraft((prev) => ({ ...prev, description: e.target.value }))
+                          }
+                          placeholder="Please describe the maintenance issue in detail..."
+                          className={`${tenantMaintenanceInputBase} min-h-[140px] resize-y`}
+                        />
+                        {tenantMaintenanceErrors.description ? (
+                          <p className="mt-1 text-xs text-red-600">{tenantMaintenanceErrors.description}</p>
+                        ) : null}
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTenantMaintenanceSuccess("");
+                            setTenantMaintenanceErrors({});
+                            setTenantMaintenanceMode("view");
+                          }}
+                          className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        >
+                          {tenantMaintenanceMode === "edit" ? "Save Changes" : "Submit Request"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -5062,7 +5435,7 @@ startxref
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-blue-100 text-sm">Total Tenants</p>
-                          <p className="text-3xl font-bold">24</p>
+                          <p className="text-3xl font-bold">{Array.isArray(tenants) ? tenants.length : 0}</p>
                         </div>
                         <div className="bg-white/20 p-3 rounded-lg">
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5075,7 +5448,7 @@ startxref
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-green-100 text-sm">Active Leases</p>
-                          <p className="text-3xl font-bold">18</p>
+                          <p className="text-3xl font-bold">{Array.isArray(tenants) ? tenants.length : 0}</p>
                         </div>
                         <div className="bg-white/20 p-3 rounded-lg">
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5088,7 +5461,17 @@ startxref
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-yellow-100 text-sm">Pending</p>
-                          <p className="text-3xl font-bold">6</p>
+                          <p className="text-3xl font-bold">
+                            {(() => {
+                              const list = Array.isArray(tenants) ? tenants : [];
+                              const start = new Date(new Date().toDateString());
+                              return list.filter(
+                                (t) =>
+                                  String(t.status).toLowerCase() !== "paid" &&
+                                  (!t.dueDate || new Date(t.dueDate) >= start)
+                              ).length;
+                            })()}
+                          </p>
                         </div>
                         <div className="bg-white/20 p-3 rounded-lg">
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5100,8 +5483,19 @@ startxref
                     <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-purple-100 text-sm">Occupancy Rate</p>
-                          <p className="text-3xl font-bold">92%</p>
+                          <p className="text-purple-100 text-sm">Overdue</p>
+                          <p className="text-3xl font-bold">
+                            {(() => {
+                              const list = Array.isArray(tenants) ? tenants : [];
+                              const start = new Date(new Date().toDateString());
+                              return list.filter(
+                                (t) =>
+                                  String(t.status).toLowerCase() !== "paid" &&
+                                  t.dueDate &&
+                                  new Date(t.dueDate) < start
+                              ).length;
+                            })()}
+                          </p>
                         </div>
                         <div className="bg-white/20 p-3 rounded-lg">
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5112,105 +5506,258 @@ startxref
                     </div>
                   </div>
 
-                  {/* Active Tenants */}
-                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden mb-8">
-                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4 border-b border-blue-200">
-                      <h3 className="text-xl font-bold text-blue-900 flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        Active Tenants
-                      </h3>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                      {[
-                        { name: 'Rajesh Kumar', unit: 'Unit A-101', rent: '25,000', lease: 'Dec 2024', status: 'active', payment: 'paid' },
-                        { name: 'Sita Sharma', unit: 'Unit B-205', rent: '18,000', lease: 'Jun 2024', status: 'active', payment: 'paid' },
-                        { name: 'Amit Singh', unit: 'Unit C-301', rent: '22,000', lease: 'Sep 2024', status: 'active', payment: 'pending' }
-                      ].map((tenant, index) => (
-                        <div key={index} className="p-6 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-                                {tenant.name.split(' ').map(n => n[0]).join('')}
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-gray-900">{tenant.name}</h4>
-                                <p className="text-sm text-gray-600">{tenant.unit} • NPR {tenant.rent}/month</p>
-                                <div className="flex items-center gap-4 mt-1">
-                                  <span className="text-xs text-gray-500">Lease ends: {tenant.lease}</span>
-                                  <span className={`text-xs px-2 py-1 rounded-full ${
-                                    tenant.payment === 'paid' 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-yellow-100 text-yellow-800'
-                                  }`}>
-                                    {tenant.payment === 'paid' ? 'Paid' : 'Pending'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-                                Contact
-                              </button>
-                              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
-                                View Details
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  {(() => {
+                    const now = new Date();
+                    const toNumber = (value) => Number(String(value || "").replace(/[^\d]/g, "")) || 0;
+                    const deriveStatus = (t) => {
+                      if (String(t.status).toLowerCase() === "paid") return "Paid";
+                      const due = t.dueDate ? new Date(t.dueDate) : null;
+                      if (due && !Number.isNaN(due.valueOf()) && due < new Date(now.toDateString())) return "Overdue";
+                      return "Pending";
+                    };
+                    const statusBadge = (status) => {
+                      if (status === "Paid") return "bg-green-100 text-green-800 border border-green-200";
+                      if (status === "Overdue") return "bg-red-100 text-red-800 border border-red-200";
+                      return "bg-yellow-100 text-yellow-800 border border-yellow-200";
+                    };
 
-                  {/* Pending Applications */}
-                  <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                    <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 px-6 py-4 border-b border-yellow-200">
-                      <h3 className="text-xl font-bold text-yellow-900 flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        Pending Applications
-                      </h3>
-                    </div>
-                    <div className="divide-y divide-gray-200">
-                      {[
-                        { name: 'Amit Singh', unit: 'Unit C-301', applied: '2 days ago', requested: '22,000', score: '85' },
-                        { name: 'Priya Patel', unit: 'Unit D-402', applied: '5 days ago', requested: '20,000', score: '92' }
-                      ].map((application, index) => (
-                        <div key={index} className="p-6 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center text-white font-bold">
-                                {application.name.split(' ').map(n => n[0]).join('')}
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-gray-900">{application.name}</h4>
-                                <p className="text-sm text-gray-600">{application.unit} • Applied {application.applied}</p>
-                                <div className="flex items-center gap-4 mt-1">
-                                  <span className="text-xs text-gray-500">Requesting: NPR {application.requested}/month</span>
-                                  <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                                    Score: {application.score}%
-                                  </span>
-                                </div>
-                              </div>
+                    const normalized = (Array.isArray(tenants) ? tenants : []).map((t) => ({
+                      ...t,
+                      derivedStatus: deriveStatus(t),
+                      rentValue: toNumber(t.rent),
+                      propertyKey: String(t.property || "").trim() || "Unknown",
+                    }));
+
+                    const properties = Array.from(new Set(normalized.map((t) => t.propertyKey))).filter(Boolean).sort();
+                    const search = tenantSearch.trim().toLowerCase();
+
+                    const filtered = normalized
+                      .filter((t) =>
+                        !search
+                          ? true
+                          : [t.name, t.property, t.unit, t.email, t.contact]
+                              .filter(Boolean)
+                              .join(" ")
+                              .toLowerCase()
+                              .includes(search)
+                      )
+                      .filter((t) => (tenantPropertyFilter === "all" ? true : t.propertyKey === tenantPropertyFilter))
+                      .filter((t) => (tenantStatusFilter === "all" ? true : t.derivedStatus === tenantStatusFilter))
+                      .sort((a, b) => (b.rentValue || 0) - (a.rentValue || 0));
+
+                    const selected = normalized.find((t) => t.id === selectedTenantId) ?? filtered[0] ?? null;
+
+                    const setTenantStatus = (tenantId, next) => {
+                      setTenants((prev) =>
+                        (Array.isArray(prev) ? prev : []).map((t) => (t.id === tenantId ? { ...t, status: next } : t))
+                      );
+                    };
+
+                    return (
+                      <>
+                        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm mb-6">
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                              <input
+                                value={tenantSearch}
+                                onChange={(e) => setTenantSearch(e.target.value)}
+                                placeholder="Search tenant, property, unit, phone…"
+                                className="w-full md:w-[360px] rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                              />
+
+                              <select
+                                value={tenantPropertyFilter}
+                                onChange={(e) => setTenantPropertyFilter(e.target.value)}
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                              >
+                                <option value="all">All properties</option>
+                                {properties.map((p) => (
+                                  <option key={p} value={p}>
+                                    {p}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <select
+                                value={tenantStatusFilter}
+                                onChange={(e) => setTenantStatusFilter(e.target.value)}
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                              >
+                                <option value="all">All status</option>
+                                <option value="Paid">Paid</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Overdue">Overdue</option>
+                              </select>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
-                                Approve
-                              </button>
-                              <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
-                                Reject
-                              </button>
-                              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
-                                Review
-                              </button>
+
+                            <div className="text-sm text-gray-600">
+                              Showing <span className="font-semibold text-gray-900">{filtered.length}</span> tenants
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 mb-8">
+                          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-gray-100">
+                              <h3 className="text-base font-semibold text-gray-900">Tenant List</h3>
+                              <p className="text-xs text-gray-500">Click a tenant to see details</p>
+                            </div>
+
+                            <div className="overflow-auto">
+                              <table className="min-w-full text-sm">
+                                <thead className="bg-gray-50 text-gray-600">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left font-semibold">Tenant</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Property</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Rent</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Due</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {filtered.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={5} className="px-4 py-10 text-center text-gray-600">
+                                        No tenants match your filters.
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    filtered.map((t) => (
+                                      <tr
+                                        key={t.id}
+                                        className={`cursor-pointer hover:bg-gray-50 ${
+                                          selected?.id === t.id ? "bg-primary/5" : ""
+                                        }`}
+                                        onClick={() => setSelectedTenantId(t.id)}
+                                      >
+                                        <td className="px-4 py-3">
+                                          <div className="font-semibold text-gray-900">{t.name}</div>
+                                          <div className="text-xs text-gray-500">{t.contact}</div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <div className="text-gray-900">{t.property}</div>
+                                          <div className="text-xs text-gray-500">{t.unit}</div>
+                                        </td>
+                                        <td className="px-4 py-3 font-semibold text-gray-900">
+                                          NPR {t.rentValue.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-700">
+                                          {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span
+                                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadge(
+                                              t.derivedStatus
+                                            )}`}
+                                          >
+                                            {t.derivedStatus}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-gray-100">
+                              <h3 className="text-base font-semibold text-gray-900">Tenant Details</h3>
+                              <p className="text-xs text-gray-500">Actions and contact</p>
+                            </div>
+
+                            <div className="p-4 space-y-4">
+                              {!selected ? (
+                                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                                  Select a tenant to see details.
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold text-gray-900">{selected.name}</p>
+                                      <p className="text-xs text-gray-500">{selected.email}</p>
+                                    </div>
+                                    <span
+                                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadge(
+                                        selected.derivedStatus
+                                      )}`}
+                                    >
+                                      {selected.derivedStatus}
+                                    </span>
+                                  </div>
+
+                                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-gray-500">Property</span>
+                                      <span className="font-semibold">{selected.property}</span>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between">
+                                      <span className="text-gray-500">Unit</span>
+                                      <span className="font-semibold">{selected.unit || "—"}</span>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between">
+                                      <span className="text-gray-500">Monthly rent</span>
+                                      <span className="font-semibold">NPR {selected.rentValue.toLocaleString()}</span>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between">
+                                      <span className="text-gray-500">Next due</span>
+                                      <span className="font-semibold">
+                                        {selected.dueDate ? new Date(selected.dueDate).toLocaleDateString() : "—"}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between">
+                                      <span className="text-gray-500">Phone</span>
+                                      <span className="font-semibold">{selected.contact || "—"}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setTenantStatus(selected.id, "Paid")}
+                                      className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    >
+                                      Mark Paid
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setTenantStatus(selected.id, "Pending")}
+                                      className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                    >
+                                      Mark Pending
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setActive("chat")}
+                                      className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                    >
+                                      Message
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setTenants((prev) =>
+                                          (Array.isArray(prev) ? prev : []).filter((t) => t.id !== selected.id)
+                                        );
+                                        setSelectedTenantId(null);
+                                      }}
+                                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+
+
                 </div>
               </div>
             </main>
@@ -5238,6 +5785,286 @@ startxref
               
               <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-7xl mx-auto">
+                  {(() => {
+                    const items = Array.isArray(listings) ? listings : [];
+                    const query = ownerListingSearch.trim().toLowerCase();
+
+                    const filtered = items
+                      .filter((p) => {
+                        if (!query) return true;
+                        return [p.name, p.address, p.city, p.state, p.zipCode, p.propertyType, p.listingType]
+                          .filter(Boolean)
+                          .join(" ")
+                          .toLowerCase()
+                          .includes(query);
+                      })
+                      .filter((p) => (ownerListingTypeFilter === "all" ? true : p.listingType === ownerListingTypeFilter))
+                      .filter((p) =>
+                        ownerListingPropertyTypeFilter === "all" ? true : p.propertyType === ownerListingPropertyTypeFilter
+                      )
+                      .sort((a, b) => (new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+
+                    const counts = {
+                      total: items.length,
+                      rent: items.filter((p) => p.listingType === "For Rent").length,
+                      sale: items.filter((p) => p.listingType === "For Sale").length,
+                      both: items.filter((p) => p.listingType === "For Both").length,
+                    };
+
+                    const deleteListing = (id) => {
+                      const stored = JSON.parse(window.localStorage.getItem("properties") || "[]");
+                      const next = (Array.isArray(stored) ? stored : []).filter((p) => p.id !== id);
+                      window.localStorage.setItem("properties", JSON.stringify(next));
+                      setListings(next);
+                    };
+
+                    const propertyTypes = Array.from(
+                      new Set(items.map((p) => p.propertyType).filter(Boolean))
+                    ).sort();
+
+                    const badgeForListingType = (type) => {
+                      if (type === "For Rent") return "bg-blue-100 text-blue-800 border border-blue-200";
+                      if (type === "For Sale") return "bg-green-100 text-green-800 border border-green-200";
+                      return "bg-purple-100 text-purple-800 border border-purple-200";
+                    };
+
+                    const formatMoney = (value) => {
+                      const num = Number(value);
+                      if (Number.isNaN(num)) return "N/A";
+                      return num.toLocaleString();
+                    };
+
+                    return (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Listings</p>
+                            <p className="mt-2 text-3xl font-bold text-gray-900">{counts.total}</p>
+                            <p className="mt-1 text-sm text-gray-600">Stored locally</p>
+                          </div>
+                          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">For Rent</p>
+                            <p className="mt-2 text-3xl font-bold text-blue-700">{counts.rent}</p>
+                            <p className="mt-1 text-sm text-gray-600">Monthly listings</p>
+                          </div>
+                          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">For Sale</p>
+                            <p className="mt-2 text-3xl font-bold text-green-700">{counts.sale}</p>
+                            <p className="mt-1 text-sm text-gray-600">Sale listings</p>
+                          </div>
+                          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">For Both</p>
+                            <p className="mt-2 text-3xl font-bold text-purple-700">{counts.both}</p>
+                            <p className="mt-1 text-sm text-gray-600">Rent + sale</p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                              <input
+                                value={ownerListingSearch}
+                                onChange={(e) => setOwnerListingSearch(e.target.value)}
+                                placeholder="Search by name, address, city…"
+                                className="w-full md:w-[360px] rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                              />
+
+                              <select
+                                value={ownerListingTypeFilter}
+                                onChange={(e) => setOwnerListingTypeFilter(e.target.value)}
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                              >
+                                <option value="all">All types</option>
+                                <option value="For Rent">For Rent</option>
+                                <option value="For Sale">For Sale</option>
+                                <option value="For Both">For Both</option>
+                              </select>
+
+                              <select
+                                value={ownerListingPropertyTypeFilter}
+                                onChange={(e) => setOwnerListingPropertyTypeFilter(e.target.value)}
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                              >
+                                <option value="all">All property types</option>
+                                {propertyTypes.map((t) => (
+                                  <option key={t} value={t}>
+                                    {t}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setOwnerListingView("grid")}
+                                  className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                                    ownerListingView === "grid" ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  Grid
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setOwnerListingView("table")}
+                                  className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                                    ownerListingView === "table" ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  Table
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm text-gray-600">
+                                Showing <span className="font-semibold text-gray-900">{filtered.length}</span> listings
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => setActive("add-property")}
+                                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              >
+                                + Add Listing
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {ownerListingView === "grid" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filtered.length === 0 ? (
+                              <div className="col-span-full rounded-2xl border border-gray-200 bg-gray-50 p-10 text-center text-gray-700">
+                                No listings found. Click <span className="font-semibold">+ Add Listing</span> to create one.
+                              </div>
+                            ) : (
+                              filtered.map((p) => (
+                                <div key={p.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                                  <div className="h-36 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                    </svg>
+                                  </div>
+
+                                  <div className="p-4 space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-gray-900 truncate">{p.name || "Untitled Property"}</p>
+                                        <p className="text-xs text-gray-500 truncate">
+                                          {[p.address, p.city, p.state].filter(Boolean).join(", ") || "Address not set"}
+                                        </p>
+                                      </div>
+                                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeForListingType(p.listingType)}`}>
+                                        {p.listingType || "—"}
+                                      </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                      <div className="rounded-xl bg-gray-50 border border-gray-200 p-2">
+                                        <p className="text-gray-500">Type</p>
+                                        <p className="font-semibold text-gray-900">{p.propertyType || "—"}</p>
+                                      </div>
+                                      <div className="rounded-xl bg-gray-50 border border-gray-200 p-2">
+                                        <p className="text-gray-500">{p.listingType === "For Sale" ? "Price" : "Rent"}</p>
+                                        <p className="font-semibold text-gray-900">
+                                          NPR {p.listingType === "For Sale" ? formatMoney(p.salePrice) : formatMoney(p.monthlyRent)}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs text-gray-600">
+                                      <span>{p.bedrooms ? `${p.bedrooms} beds` : "— beds"}</span>
+                                      <span>{p.bathrooms ? `${p.bathrooms} baths` : "— baths"}</span>
+                                      <span>{p.squareFootage ? `${p.squareFootage} sqft` : "— sqft"}</span>
+                                    </div>
+
+                                    <div className="flex gap-2 pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => alert("Edit UI is demo-only. You can re-add details in Add Property.")}
+                                        className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteListing(p.id)}
+                                        className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                            <div className="overflow-auto">
+                              <table className="min-w-full text-sm">
+                                <thead className="bg-gray-50 text-gray-600">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left font-semibold">Listing</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Type</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Rent/Price</th>
+                                    <th className="px-4 py-3 text-left font-semibold">City</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {filtered.length === 0 ? (
+                                    <tr>
+                                      <td colSpan={5} className="px-4 py-10 text-center text-gray-600">
+                                        No listings found.
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    filtered.map((p) => (
+                                      <tr key={p.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                          <div className="font-semibold text-gray-900">{p.name || "Untitled Property"}</div>
+                                          <div className="text-xs text-gray-500">{p.address || "Address not set"}</div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${badgeForListingType(p.listingType)}`}>
+                                            {p.listingType || "—"}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3 font-semibold text-gray-900">
+                                          NPR {p.listingType === "For Sale" ? formatMoney(p.salePrice) : formatMoney(p.monthlyRent)}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-700">{p.city || "—"}</td>
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => alert("Edit UI is demo-only. You can re-add details in Add Property.")}
+                                              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                            >
+                                              Edit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteListing(p.id)}
+                                              className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                                            >
+                                              Delete
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="hidden">
                   {/* Stats Overview */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
@@ -5382,6 +6209,7 @@ startxref
                   <button className="w-full bg-gradient-to-r from-primary to-primary-dark text-white px-6 py-4 rounded-xl hover:from-primary-dark hover:to-primary font-semibold text-lg shadow-lg transition-all transform hover:scale-[1.02]">
                     + Add New Listing
                   </button>
+                  </div>
                 </div>
               </div>
             </main>
@@ -5409,6 +6237,188 @@ startxref
               
               <div className="flex-1 overflow-y-auto p-6">
                 <div className="max-w-7xl mx-auto">
+                  {(() => {
+                    if (userType !== "owner" || !user?.username) {
+                      return (
+                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-10 text-center text-gray-700">
+                          Financial reports are available for owners.
+                        </div>
+                      );
+                    }
+
+                    const allAccounts = loadArray(STORAGE_KEYS.rentAccounts);
+                    const mine = (Array.isArray(allAccounts) ? allAccounts : []).filter(
+                      (a) => a.ownerUsername === user.username
+                    );
+
+                    const now = new Date();
+                    const startOfRange = (() => {
+                      if (ownerFinanceRange === "all") return null;
+                      if (ownerFinanceRange === "year") return new Date(now.getFullYear(), 0, 1);
+                      return new Date(now.getFullYear(), now.getMonth(), 1);
+                    })();
+
+                    const payments = mine
+                      .flatMap((a) =>
+                        (Array.isArray(a.history) ? a.history : []).map((p) => ({
+                          ...p,
+                          propertyId: a.propertyId,
+                          propertyLabel: a.propertyLabel,
+                          tenantUsername: a.tenantUsername,
+                        }))
+                      )
+                      .filter((p) => {
+                        const key = p.propertyId || p.propertyLabel || "";
+                        if (ownerFinancePropertyFilter === "all") return true;
+                        return String(key) === ownerFinancePropertyFilter;
+                      })
+                      .filter((p) => {
+                        if (!startOfRange) return true;
+                        const paidAt = p.paidAt ? new Date(p.paidAt) : null;
+                        return paidAt && !Number.isNaN(paidAt.valueOf()) && paidAt >= startOfRange;
+                      })
+                      .sort((a, b) => new Date(b.paidAt || 0) - new Date(a.paidAt || 0));
+
+                    const income = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                    const unpaid = mine.filter((a) => a.status !== "Paid");
+                    const outstanding = unpaid.reduce((sum, a) => sum + (Number(a.monthlyRent) || 0), 0);
+
+                    const propertyOptions = (() => {
+                      const map = new Map();
+                      for (const a of mine) {
+                        const key = String(a.propertyId || a.propertyLabel || "");
+                        if (!key) continue;
+                        if (!map.has(key)) map.set(key, a.propertyLabel || key);
+                      }
+                      return Array.from(map.entries()).map(([key, label]) => ({ key, label }));
+                    })();
+
+                    const rangeLabel =
+                      ownerFinanceRange === "month"
+                        ? "This month"
+                        : ownerFinanceRange === "year"
+                        ? "This year"
+                        : "All time";
+
+                    return (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Income</p>
+                            <p className="mt-2 text-3xl font-bold text-gray-900">NPR {income.toLocaleString()}</p>
+                            <p className="mt-1 text-sm text-gray-600">{rangeLabel}</p>
+                          </div>
+                          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Outstanding</p>
+                            <p className="mt-2 text-3xl font-bold text-yellow-700">NPR {outstanding.toLocaleString()}</p>
+                            <p className="mt-1 text-sm text-gray-600">{unpaid.length} unpaid accounts</p>
+                          </div>
+                          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Payments</p>
+                            <p className="mt-2 text-3xl font-bold text-blue-700">{payments.length}</p>
+                            <p className="mt-1 text-sm text-gray-600">Recorded</p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Range</span>
+                                <select
+                                  value={ownerFinanceRange}
+                                  onChange={(e) => setOwnerFinanceRange(e.target.value)}
+                                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                >
+                                  <option value="month">This month</option>
+                                  <option value="year">This year</option>
+                                  <option value="all">All time</option>
+                                </select>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Property</span>
+                                <select
+                                  value={ownerFinancePropertyFilter}
+                                  onChange={(e) => setOwnerFinancePropertyFilter(e.target.value)}
+                                  className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                >
+                                  <option value="all">All properties</option>
+                                  {propertyOptions.map((o) => (
+                                    <option key={o.key} value={o.key}>
+                                      {o.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => alert("Download is demo-only.")}
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              >
+                                Download
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => alert("Export is demo-only.")}
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                              >
+                                Export
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                          <div className="p-4 border-b border-gray-100">
+                            <h2 className="text-base font-semibold text-gray-900">Payment History</h2>
+                            <p className="text-xs text-gray-500">Latest payments from tenants</p>
+                          </div>
+                          <div className="overflow-auto">
+                            <table className="min-w-full text-sm">
+                              <thead className="bg-gray-50 text-gray-600">
+                                <tr>
+                                  <th className="px-4 py-3 text-left font-semibold">Date</th>
+                                  <th className="px-4 py-3 text-left font-semibold">Property</th>
+                                  <th className="px-4 py-3 text-left font-semibold">Tenant</th>
+                                  <th className="px-4 py-3 text-left font-semibold">Method</th>
+                                  <th className="px-4 py-3 text-left font-semibold">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {payments.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={5} className="px-4 py-10 text-center text-gray-600">
+                                      No payments recorded yet.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  payments.map((p) => (
+                                    <tr key={p.id} className="hover:bg-gray-50">
+                                      <td className="px-4 py-3 text-gray-700">
+                                        {p.paidAt ? new Date(p.paidAt).toLocaleString() : "—"}
+                                      </td>
+                                      <td className="px-4 py-3 text-gray-900">{p.propertyLabel || "—"}</td>
+                                      <td className="px-4 py-3 text-gray-700">{p.tenantUsername || "—"}</td>
+                                      <td className="px-4 py-3 text-gray-700">{p.method || "—"}</td>
+                                      <td className="px-4 py-3 font-semibold text-gray-900">
+                                        NPR {(Number(p.amount) || 0).toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="hidden">
                   {/* Stats Overview */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
@@ -5594,6 +6604,7 @@ startxref
                       </svg>
                       Export to Excel
                     </button>
+                  </div>
                   </div>
                 </div>
               </div>

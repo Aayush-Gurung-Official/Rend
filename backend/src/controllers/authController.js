@@ -14,10 +14,10 @@ const signup = async (req, res, next) => {
   try {
     const { username, email, password, fullName, phone, userType, profileImage, bio } = req.body;
 
-    if (!username || !email || !password || !fullName) {
+    if (!username || !email || !password) {
       return res
         .status(400)
-        .json({ message: "Username, email, password and full name are required" });
+        .json({ message: "Username, email and password are required" });
     }
 
     if (password.length < 6) {
@@ -43,12 +43,13 @@ const signup = async (req, res, next) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const normalizedFullName = String(fullName || "").trim() || String(username).trim();
 
     const user = await User.create({ 
-      username, 
-      email, 
+      username,
+      email,
       passwordHash, 
-      fullName, 
+      fullName: normalizedFullName,
       phone, 
       userType: userType || 'user', 
       profileImage, 
@@ -125,17 +126,35 @@ const updateProfile = async (req, res, next) => {
       return res.status(400).json({ message: "User id is required" });
     }
 
+    const updates = {};
+
+    if (username !== undefined) {
+      const nextUsername = String(username).trim();
+      if (nextUsername) updates.username = nextUsername;
+    }
+    if (email !== undefined) {
+      const nextEmail = String(email).trim();
+      if (nextEmail) updates.email = nextEmail;
+    }
+    if (phone !== undefined) updates.phone = String(phone).trim();
+    if (profileImage !== undefined) updates.profileImage = profileImage;
+    if (bio !== undefined) updates.bio = bio;
+    if (fullName !== undefined) {
+      const nextFullName = String(fullName).trim();
+      if (nextFullName) updates.fullName = nextFullName;
+    }
+
     // Check if username is being changed and if it's already taken
-    if (username) {
-      const existingUsername = await User.findOne({ username, _id: { $ne: id } });
+    if (updates.username) {
+      const existingUsername = await User.findOne({ username: updates.username, _id: { $ne: id } });
       if (existingUsername) {
         return res.status(409).json({ message: "This username is already taken" });
       }
     }
 
     // Check if email is being changed and if it's already taken
-    if (email) {
-      const existingEmail = await User.findOne({ email, _id: { $ne: id } });
+    if (updates.email) {
+      const existingEmail = await User.findOne({ email: updates.email, _id: { $ne: id } });
       if (existingEmail) {
         return res.status(409).json({ message: "This email is already registered" });
       }
@@ -143,8 +162,8 @@ const updateProfile = async (req, res, next) => {
 
     const user = await User.findByIdAndUpdate(
       id,
-      { username, email, fullName, phone, profileImage, bio },
-      { new: true }
+      { $set: updates },
+      { new: true, runValidators: true }
     );
 
     if (!user) {

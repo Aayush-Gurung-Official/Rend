@@ -1,6 +1,13 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const ListProperty = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    navigate("/auth", { replace: true });
+  }, [navigate]);
+
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold text-slate-900">
