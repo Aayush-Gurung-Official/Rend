@@ -139,51 +139,72 @@ const UserDashboard = () => {
   const renderOverview = () => (
     <div className="space-y-6">
       {/* Rent Payment Card */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
-        <h2 className="text-xl font-bold mb-4">Rent Payment</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/20 backdrop-blur rounded-lg p-4">
-            <p className="text-blue-100 text-sm">Current Rent</p>
-            <p className="text-2xl font-bold">{rentData.currentRent}</p>
+      <div className="card-solid border-l-4 border-primary p-6">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Rent payment
+            </h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              A quick summary of your current rent and due date.
+            </p>
           </div>
-          <div className="bg-white/20 backdrop-blur rounded-lg p-4">
-            <p className="text-blue-100 text-sm">Due Date</p>
-            <p className="text-2xl font-bold">{rentData.dueDate}</p>
+          <span className="badge w-fit">Status: {rentData.status}</span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 dark:bg-slate-950/40 dark:ring-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Current rent
+            </p>
+            <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {rentData.currentRent}
+            </p>
           </div>
-          <div className="bg-white/20 backdrop-blur rounded-lg p-4">
-            <p className="text-blue-100 text-sm">Status</p>
-            <p className="text-2xl font-bold">{rentData.status}</p>
+          <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 dark:bg-slate-950/40 dark:ring-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Due date
+            </p>
+            <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {rentData.dueDate}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 dark:bg-slate-950/40 dark:ring-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Next payment
+            </p>
+            <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {rentData.nextPayment}
+            </p>
           </div>
         </div>
-        <div className="mt-4 flex gap-3">
-          <button 
-            onClick={handlePayRent}
-            className="bg-white text-blue-600 font-semibold py-2 px-4 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            Pay Rent Now
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <button type="button" onClick={handlePayRent} className="btn btn-primary">
+            Pay rent
           </button>
-          <button className="bg-white/20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-white/30 transition-colors">
-            Payment History
+          <button type="button" className="btn btn-outline">
+            View history
           </button>
         </div>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <h3 className="font-semibold text-gray-800 mb-2">Active Lease</h3>
+        <div className="card-solid p-6">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">Active lease</h3>
           <p className="text-2xl font-bold text-primary">1</p>
-          <p className="text-sm text-gray-500">Property</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Property</p>
         </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <h3 className="font-semibold text-gray-800 mb-2">Next Payment</h3>
-          <p className="text-lg font-bold text-orange-600">{rentData.nextPayment}</p>
-          <p className="text-sm text-gray-500">30 days remaining</p>
+        <div className="card-solid p-6">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">Next payment</h3>
+          <p className="text-lg font-bold text-primary">{rentData.nextPayment}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Reminder available</p>
         </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <h3 className="font-semibold text-gray-800 mb-2">Maintenance</h3>
-          <p className="text-2xl font-bold text-yellow-600">{maintenanceRequests.filter(r => r.status !== 'Completed').length}</p>
-          <p className="text-sm text-gray-500">Open requests</p>
+        <div className="card-solid p-6">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">Maintenance</h3>
+          <p className="text-2xl font-bold text-primary">{maintenanceRequests.filter(r => r.status !== 'Completed').length}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Open requests</p>
         </div>
       </div>
     </div>
@@ -192,6 +213,34 @@ const UserDashboard = () => {
   const renderProperties = () => (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-900 mb-4">My Rented Properties</h2>
+
+      {(() => {
+        const toNumber = (value) => Number(String(value || "").replace(/[^\d]/g, "")) || 0;
+        const history = Array.isArray(rentData.paymentHistory) ? rentData.paymentHistory : [];
+        const totalPaid = history.reduce((sum, p) => sum + toNumber(p.amount), 0);
+        const lastPayment = history[0] ?? null;
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Paid</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">NPR {totalPaid.toLocaleString()}</p>
+              <p className="mt-1 text-sm text-gray-600">{history.length} payments recorded</p>
+            </div>
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Next Due</p>
+              <p className="mt-2 text-2xl font-bold text-orange-600">{rentData.nextPayment}</p>
+              <p className="mt-1 text-sm text-gray-600">Due date from your rent schedule</p>
+            </div>
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Last Payment</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{lastPayment?.date || "—"}</p>
+              <p className="mt-1 text-sm text-gray-600">{lastPayment?.method ? `Method: ${lastPayment.method}` : "—"}</p>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {myProperties.map((property) => (
           <div key={property.id} className="bg-white rounded-xl border border-gray-200 p-4">
@@ -528,30 +577,30 @@ const UserDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4">
+    <div className="min-h-screen bg-slate-50 py-8 dark:bg-slate-950/20">
+      <div className="rend-container">
         <div className="mb-8">
           <button
             onClick={() => navigate('/')}
-            className="mb-4 text-primary hover:text-primary/80 font-medium"
+            className="btn btn-ghost mb-4 px-0 py-0 text-sm text-primary hover:text-primary-dark"
           >
             &larr; Back to Home
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
-          <p className="text-gray-600">Manage your rental experience and payments</p>
+          <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">My Dashboard</h1>
+          <p className="text-slate-600 dark:text-slate-300">Manage your rental experience and payments</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
           {/* Dashboard Nav */}
-          <aside className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden h-fit lg:sticky lg:top-6">
-            <div className="p-5 border-b border-gray-100">
+          <aside className="card-solid p-0 overflow-hidden h-fit lg:sticky lg:top-24">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-3">
                 <div className="h-11 w-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold">
                   {userProfile.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{userProfile.name}</p>
-                  <p className="text-xs text-gray-500 truncate">{userProfile.email}</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{userProfile.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{userProfile.email}</p>
                 </div>
               </div>
             </div>
@@ -569,7 +618,7 @@ const UserDashboard = () => {
                   className={`w-full text-left rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                     activeTab === item.key
                       ? 'bg-primary text-white shadow-sm'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900/40'
                   }`}
                 >
                   {item.label}
@@ -579,7 +628,7 @@ const UserDashboard = () => {
           </aside>
 
           {/* Content */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+          <div className="card-solid p-0">
             <div className="p-6">
               {activeTab === 'overview' && renderOverview()}
               {activeTab === 'properties' && renderProperties()}

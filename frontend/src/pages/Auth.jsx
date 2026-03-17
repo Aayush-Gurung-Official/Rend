@@ -33,41 +33,51 @@ const Auth = () => {
         setSuccess("Account created successfully! Please login to continue.");
         setMode("login");
         resetFields();
-      } else {
-        window.localStorage.setItem("rendUser", JSON.stringify(user));
-        navigate("/user-type");
+        return;
       }
+
+      window.localStorage.setItem("rendUser", JSON.stringify(user));
+      navigate("/user-type");
     } catch (err) {
       const msg =
-        err?.response?.data?.message || err?.message || "Something went wrong. Please try again.";
+        err?.response?.data?.message ||
+        err?.message ||
+        "Something went wrong. Please try again.";
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleClick = () => {
-    setError("Google sign-in is not configured yet. Ask your developer to connect Google OAuth.");
-  };
-
   return (
     <section className="flex min-h-[80vh] items-center justify-center">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-slate-900">
-            {mode === "signup" ? "Create your account" : "Login"}
-          </h1>
+      <div className="card-solid w-full max-w-md p-6">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+              {mode === "signup" ? "Create your account" : "Login"}
+            </h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {mode === "signup"
+                ? "Sign up to list properties and manage rentals."
+                : "Welcome back. Continue to your dashboard."}
+            </p>
+          </div>
+
           <div className="flex items-center gap-2">
             <button
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900"
+              type="button"
+              className="btn btn-ghost px-2 py-1 text-xs"
               onClick={() => navigate("/")}
             >
               Back
             </button>
             <button
-              className="text-xs font-semibold text-primary hover:text-primary-dark"
+              type="button"
+              className="btn btn-ghost px-2 py-1 text-xs text-primary hover:text-primary-dark"
               onClick={() => {
                 setError("");
+                setSuccess("");
                 resetFields();
                 setMode((m) => (m === "signup" ? "login" : "signup"));
               }}
@@ -79,32 +89,40 @@ const Auth = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4 text-sm">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">
+            <label className="label" htmlFor="auth-username">
               Username
             </label>
             <input
+              id="auth-username"
               type="text"
               required
+              autoFocus
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="input w-full"
               placeholder="Your username"
+              autoComplete="username"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">
+            <label className="label" htmlFor="auth-password">
               Password
             </label>
             <input
+              id="auth-password"
               type="password"
               required
-              minLength="6"
+              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="input w-full"
               placeholder="At least 6 characters"
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
             />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Tip: Use a unique password you don’t use elsewhere.
+            </p>
           </div>
 
           {error && (
@@ -114,16 +132,12 @@ const Auth = () => {
           )}
 
           {success && (
-            <p className="text-xs font-semibold text-green-600" role="alert">
+            <p className="text-xs font-semibold text-green-600" role="status">
               {success}
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-70"
-          >
+          <button type="submit" disabled={loading} className="btn btn-primary w-full">
             {loading ? "Please wait…" : mode === "signup" ? "Sign up" : "Login"}
           </button>
         </form>
@@ -133,4 +147,3 @@ const Auth = () => {
 };
 
 export default Auth;
-
